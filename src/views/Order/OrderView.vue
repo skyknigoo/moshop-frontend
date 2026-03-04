@@ -10,9 +10,8 @@
     <div class="surface-card shadow-1 border-round p-3 mb-4">
       <div class="grid align-items-center">
         <div class="col-12 lg:col-8">
-          <SelectButton v-model="selectedStatus" :options="statusOptions" 
-                        optionLabel="label" optionValue="value" 
-                        @change="handleFilterChange" />
+          <SelectButton v-model="selectedStatus" :options="statusOptions" optionLabel="label" optionValue="value"
+            @change="handleFilterChange" />
         </div>
         <div class="col-12 lg:col-4">
           <div class="p-inputgroup">
@@ -24,9 +23,8 @@
     </div>
 
     <div class="surface-card shadow-1 border-round overflow-hidden">
-      <DataTable :value="orders" :loading="loading" responsiveLayout="stack" breakpoint="960px"
-                 class="p-datatable-sm">
-        
+      <DataTable :value="orders" :loading="loading" responsiveLayout="stack" breakpoint="960px" class="p-datatable-sm">
+
         <template #empty>
           <div class="text-center py-5 text-500">目前沒有相關的訂單紀錄。</div>
         </template>
@@ -34,8 +32,8 @@
         <Column header="商品資訊">
           <template #body="{ data }">
             <div class="flex align-items-center gap-3">
-              <PImage :src="data.product?.imagePath || '/uploads/Comm/等待餵圖.png'" 
-                     width="70" imageClass="border-round shadow-1" />
+              <PImage :src="data.product?.imagePath || '/uploads/Comm/等待餵圖.png'" width="70"
+                imageClass="border-round shadow-1" />
               <div>
                 <div class="font-bold text-900">{{ data.product?.productName }}</div>
                 <small class="text-500 block mt-1">訂單編號: #{{ data.orderID }}</small>
@@ -59,28 +57,29 @@
         <Column header="狀態/時間" style="min-width: 220px">
           <template #body="{ data }">
             <Tag :value="getStatusLabel(data.status)" :severity="getStatusSeverity(data.status)" class="mb-2 px-3" />
-            
+
             <div class="text-xs text-600 line-height-3">
               <div v-if="data.status === 0"><i class="pi pi-clock mr-1"></i>下單: {{ formatDate(data.orderDate) }}</div>
-              <div v-else-if="data.status === 1"><i class="pi pi-send mr-1"></i>出貨: {{ formatDate(data.shipmentDate) }}</div>
-              <div v-else-if="data.status === 2"><i class="pi pi-check-circle mr-1"></i>完成: {{ formatDate(data.finishDate) }}</div>
-              <div v-else-if="data.status === 4"><i class="pi pi-exclamation-circle mr-1"></i>退貨: {{ formatDate(data.returnStoreDate) }}</div>
+              <div v-else-if="data.status === 1"><i class="pi pi-send mr-1"></i>出貨: {{ formatDate(data.shipmentDate) }}
+              </div>
+              <div v-else-if="data.status === 2"><i class="pi pi-check-circle mr-1"></i>完成: {{
+                formatDate(data.finishDate) }}</div>
+              <div v-else-if="data.status === 4"><i class="pi pi-exclamation-circle mr-1"></i>退貨: {{
+                formatDate(data.returnStoreDate) }}</div>
             </div>
 
             <div v-if="data.status === 1" class="flex gap-2 mt-2">
-              <PButton label="完成訂單" icon="pi pi-check" severity="success" size="small" 
-                      @click="confirmUpdate(data.orderID, 'CompleteOrder')" />
-              <PButton label="申請退貨" icon="pi pi-undo" severity="danger" size="small" outlined 
-                      @click="confirmUpdate(data.orderID, 'ReturnOrder')" />
+              <PButton label="完成訂單" icon="pi pi-check" severity="success" size="small"
+                @click="confirmUpdate(data.orderID, 'CompleteOrder')" />
+              <PButton label="申請退貨" icon="pi pi-undo" severity="danger" size="small" outlined
+                @click="confirmUpdate(data.orderID, 'ReturnOrder')" />
             </div>
           </template>
         </Column>
       </DataTable>
 
       <div class="p-3 border-top-1 surface-border bg-white">
-        <Paginator :rows="10" :totalRecords="totalRecords" 
-                   :first="(currentPage - 1) * 10" 
-                   @page="onPageChange" />
+        <Paginator :rows="10" :totalRecords="totalRecords" :first="(currentPage - 1) * 10" @page="onPageChange" />
       </div>
     </div>
   </div>
@@ -95,6 +94,7 @@ import SelectButton from 'primevue/selectbutton';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Paginator from 'primevue/paginator';
+import api from '@/api/axios';
 
 const toast = useToast();
 const confirm = useConfirm();
@@ -141,9 +141,9 @@ const fetchOrders = async (page = 1) => {
       status: selectedStatus.value
     };
     // 呼叫後端 OrderApiController
-    const res = await axios.get('http://localhost:5158/api/OrderApi', { params });
-    orders.value = res.data.items;
-    totalRecords.value = res.data.pagination.totalCount;
+    const res = await api.get('/OrderApi', { params });
+    orders.value = res.items;
+    totalRecords.value = res.pagination.totalCount;
   } catch (e) {
     console.error(e)
     toast.add({ severity: 'error', summary: '連線錯誤', detail: '無法讀取訂單清單', life: 3000 });
@@ -171,7 +171,7 @@ const confirmUpdate = (orderId, action) => {
     accept: async () => {
       try {
         const res = await axios.post(`http://localhost:5158/api/OrderApi/${action}/${orderId}`);
-        if (res.data.success) {
+        if (res.success) {
           toast.add({ severity: 'success', summary: '操作成功', detail: res.data.message, life: 3000 });
           fetchOrders(currentPage.value);
         }

@@ -5,13 +5,8 @@
 
     <div class="flex justify-content-between align-items-center mb-4">
       <h2 class="text-3xl font-bold m-0 text-900">👤 帳號管理系統 (Vue API 版)</h2>
-      <PButton 
-        label="新增帳號" 
-        icon="pi pi-user-plus" 
-        severity="success" 
-        class="shadow-2"
-        @click="router.push('/manage/account/create')" 
-      />
+      <PButton label="新增帳號" icon="pi pi-user-plus" severity="success" class="shadow-2"
+        @click="router.push('/manage/account/create')" />
     </div>
 
     <Card class="mb-4 shadow-1 border-none">
@@ -28,7 +23,7 @@
           <div class="col-12 md:col-4">
             <div class="flex gap-2">
               <PButton label="查詢" icon="pi pi-search" severity="dark" class="flex-1" @click="loadData" />
-              <PButton label="重置" icon="pi pi-refresh" severity="secondary" outlined @click="resetFilters" />
+              <PButton label="清除" icon="pi pi-refresh" severity="secondary" outlined @click="resetFilters" />
             </div>
           </div>
         </div>
@@ -36,16 +31,10 @@
     </Card>
 
     <div class="surface-card border-round shadow-1 overflow-hidden">
-      <DataTable 
-        :value="members" 
-        :loading="loading" 
-        stripedRows 
-        responsiveLayout="scroll"
-        class="p-datatable-sm"
-      >
+      <DataTable :value="members" :loading="loading" stripedRows responsiveLayout="scroll" class="p-datatable-sm">
         <Column field="account" header="帳號" class="font-bold text-900" />
         <Column field="memberName" header="名稱" />
-        
+
         <Column header="最後修改時間">
           <template #body="{ data }">
             <span v-if="data.updatedAt">
@@ -62,24 +51,13 @@
           </template>
         </Column>
 
-        <Column header="操作" class="text-right pr-4" style="width: 180px">
+        <Column header="操作" class="text-right pr-2" style="width: 180px">
           <template #body="{ data }">
             <div class="flex gap-2 justify-content-end">
-              <PButton 
-                label="修改" 
-                icon="pi pi-pencil" 
-                outlined 
-                size="small" 
-                @click="router.push(`/manage/account/edit/${data.account}`)" 
-              />
-              <PButton 
-                label="刪除" 
-                icon="pi pi-trash" 
-                severity="danger" 
-                outlined 
-                size="small" 
-                @click="confirmDelete(data)" 
-              />
+              <PButton label="修改" icon="pi pi-pencil" outlined size="small"
+                @click="router.push(`/manage/account/edit/${data.account}`)" />
+              <PButton label="刪除" icon="pi pi-trash" severity="danger" outlined size="small"
+                @click="confirmDelete(data)" />
             </div>
           </template>
         </Column>
@@ -89,13 +67,9 @@
         </template>
       </DataTable>
 
-      <Paginator 
-        :rows="10" 
-        :totalRecords="totalRecords" 
-        @page="onPageChange" 
+      <Paginator :rows="10" :totalRecords="totalRecords" @page="onPageChange"
         template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-        currentPageReportTemplate="顯示第 {first} 至 {last} 筆，共 {totalRecords} 筆" 
-      />
+        currentPageReportTemplate="顯示第 {first} 至 {last} 筆，共 {totalRecords} 筆" />
     </div>
   </div>
 </template>
@@ -103,9 +77,9 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
+import api from '@/api/axios';
 
 const router = useRouter();
 const toast = useToast();
@@ -126,14 +100,14 @@ const loadData = async () => {
   loading.value = true;
   try {
     // 對接 MAccountApiController.cs
-    const res = await axios.get('http://localhost:5158/api/manage/MAccountApi', { 
-      params: filters.value ,
+    const res = await api.get('/manage/MAccountApi', {
+      params: filters.value,
       withCredentials: true
     });
-    
+
     // API 回傳結構：{ items: [], pagination: { totalCount: X } }
-    members.value = res.data.items;
-    totalRecords.value = res.data.pagination.totalCount;
+    members.value = res.items;
+    totalRecords.value = res.pagination.totalCount;
   } catch (e) {
     console.error(e)
     toast.add({ severity: 'error', summary: '載入失敗', detail: '伺服器連線異常' });
@@ -154,14 +128,14 @@ const confirmDelete = (user) => {
     accept: async () => {
       try {
         // 對接 API: Post Delete
-        const res = await axios.post(`http://localhost:5158/api/manage/MAccountApi/Delete/${user.account}`);
-        
-        if (res.data.success) {
-          toast.add({ severity: 'success', summary: '成功', detail: res.data.message, life: 3000 });
+        const res = await api.post(`/manage/MAccountApi/Delete/${user.account}`);
+
+        if (res.success) {
+          toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 3000 });
           loadData(); // 重新整理表格，不需重新整理網頁
         }
       } catch (err) {
-        toast.add({ severity: 'error', summary: '刪除失敗', detail: err.response?.data?.message || '刪除失敗' });
+        toast.add({ severity: 'error', summary: '刪除失敗', detail: err.response?.message || '刪除失敗' });
       }
     }
   });

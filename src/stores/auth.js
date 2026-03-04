@@ -11,44 +11,50 @@ export const useAuthStore = defineStore('auth', () => {
         System: 4
     };
 
-    const user = ref(null); 
+    // 初始化：從 localStorage 嘗試抓取舊資料，避免重新整理就登出
+    const user = ref(JSON.parse(localStorage.getItem('moshop_user')) || null); 
+    const token = ref(localStorage.getItem('moshop_token') || null);
 
-    // 取得目前使用者的數字等級 (核心修正)
+    // 取得目前使用者的數字等級
     const currentUserLevel = computed(() => {
-        const roleName = user.value?.role; // 假設 API 回傳 'Admin'
+        const roleName = user.value?.role; 
         return RoleLevel[roleName] || 0;
     });
 
-    const isLoggedIn = computed(() => user.value !== null);
+    const isLoggedIn = computed(() => user.value !== null && token.value !== null);
 
-    // 2. 精確權限判斷 (改用數字比較，更安全)
+    // 2. 精確權限判斷
     const isNormal = computed(() => currentUserLevel.value === RoleLevel.Normal);
     const isStore  = computed(() => currentUserLevel.value === RoleLevel.Store);
     const isAdmin  = computed(() => currentUserLevel.value === RoleLevel.Admin);
     const isSystem = computed(() => currentUserLevel.value === RoleLevel.System);
 
     // 3. 複合權限判斷 (階層式)
-    // 只要等級 >= 2 (店家、管理員、系統) 就能管理商品
     const canManageProduct = computed(() => currentUserLevel.value >= RoleLevel.Store);
-
-    // 只要等級 >= 3 (管理員、系統) 就能進入控制台
     const canAccessAdmin = computed(() => currentUserLevel.value >= RoleLevel.Admin);
 
-    // 動作：登入
-    const login = (userData) => { 
+    // 動作：登入 (更新：接收兩個參數)
+    const login = (userData, newToken) => { 
         user.value = userData; 
+        token.value = newToken;
+        
+        // 同步存入瀏覽器「錢包」
         localStorage.setItem('moshop_user', JSON.stringify(userData));
+        localStorage.setItem('moshop_token', newToken);
     };
     
     // 動作：登出
     const logout = () => { 
         user.value = null; 
+        token.value = null;
         localStorage.removeItem('moshop_user');
+        localStorage.removeItem('moshop_token');
     };
 
     return { 
         user,
-        currentUserLevel, // 導出這個屬性供組件過濾使用
+        token, // 記得導出 token
+        currentUserLevel,
         isLoggedIn, 
         isNormal, 
         isStore, 

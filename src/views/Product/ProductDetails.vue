@@ -5,22 +5,24 @@
     <nav class="flex align-items-center gap-2 mb-4 text-sm">
       <router-link to="/" class="text-primary no-underline hover:underline">商品首頁</router-link>
       <i class="pi pi-chevron-right text-xs text-400"></i>
-      <span class="text-600" v-if="product">{{ product.groupName }}</span>
+      <span class="text-600" v-if="product">{{ product.group.groupName }}</span>
     </nav>
 
     <div v-if="loading" class="grid">
-      <div class="col-12 md:col-6"><Skeleton height="500px" /></div>
-      <div class="col-12 md:col-6"><Skeleton height="500px" /></div>
+      <div class="col-12 md:col-6">
+        <Skeleton height="500px" />
+      </div>
+      <div class="col-12 md:col-6">
+        <Skeleton height="500px" />
+      </div>
     </div>
 
     <div v-else-if="product" class="grid">
-      
+
       <div class="col-12 md:col-6 pr-md-4">
         <div class="surface-card p-2 border-round shadow-1 mb-4">
-          <PImage :src="product.imagePath || '/uploads/Comm/等待餵圖.png'" 
-                 preview 
-                 imageStyle="max-height: 500px; width: 100%; object-fit: contain;" 
-                 class="w-full" />
+          <PImage :src="product.imagePath || '/uploads/Comm/等待餵圖.png'" preview
+            imageStyle="max-height: 500px; width: 100%; object-fit: contain;" class="w-full" />
         </div>
         <div class="mt-4">
           <h3 class="font-bold text-xl mb-2 border-bottom-1 surface-border pb-2">商品描述</h3>
@@ -31,7 +33,7 @@
       </div>
 
       <div class="col-12 md:col-6 pl-md-4">
-        <h6 class="text-primary font-bold uppercase mb-1">{{ product.groupName }}</h6>
+        <h6 class="text-primary font-bold uppercase mb-1">{{ product.group.groupName }}</h6>
         <h1 class="text-4xl font-bold mb-3 text-900">{{ product.productName }}</h1>
 
         <div class="mb-4">
@@ -41,24 +43,23 @@
         <Divider />
 
         <div class="surface-100 p-3 border-round mb-4">
-          <div class="grid text-center">
-            <div class="col-6 border-right-1 border-300">
+          <div class="grid text-center flex">
+            <div class="col-6">
               <small class="text-600 block mb-2">購買數量</small>
-              <InputNumber v-model="quantity" showButtons buttonLayout="horizontal" 
-                           :min="1" :max="product.stockQty"
-                           decrementButtonIcon="pi pi-minus" incrementButtonIcon="pi pi-plus" 
-                           inputClass="text-center w-full" class="w-full" />
+              <InputNumber v-model="quantity" showButtons buttonLayout="horizontal" :min="1" :max="product.stockQty"
+                decrementButtonIcon="pi pi-minus" incrementButtonIcon="pi pi-plus" inputClass="text-center w-full"
+                class="w-full" />
             </div>
             <div class="col-6">
-              <small class="text-600 block mb-2">剩餘數量</small>
-              <span class="text-xl font-bold text-900">{{ product.stockQty }}</span>
+              <small class="text-600 block mb-3">剩餘數量</small>
+              <span class="text-xl font-bold text-900 ">{{ product.stockQty }}</span>
             </div>
           </div>
         </div>
 
         <div class="border-1 surface-border border-round p-3 shadow-1 mb-4">
           <div class="font-bold mb-3 flex align-items-center">
-            <i class="pi pi-truck mr-2 text-primary"></i> 
+            <i class="pi pi-truck mr-2 text-primary"></i>
             收件資訊 <span class="text-sm font-normal text-500 ml-2">(目前僅提供貨到付款)</span>
           </div>
 
@@ -102,10 +103,9 @@
         </div>
 
         <div class="flex flex-column gap-2">
-          <PButton label="立即購買" icon="pi pi-shopping-bag" severity="success" 
-                  class="w-full p-3 font-bold text-lg" @click="handlePurchase" />
-          <PButton label="回商品列表" icon="pi pi-arrow-left" text 
-                  class="w-full" @click="$router.push('/')" />
+          <PButton label="立即購買" icon="pi pi-shopping-bag" severity="success" class="w-full p-3 font-bold text-lg"
+            @click="handlePurchase" />
+          <PButton label="回商品列表" icon="pi pi-arrow-left" text class="w-full" @click="$router.push('/')" />
         </div>
       </div>
     </div>
@@ -141,10 +141,10 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import Dialog from 'primevue/dialog';
 import { useRouter } from 'vue-router'; // 1. 確保有匯入 router
+import api from '@/api/axios'
 
 const props = defineProps(['id']);
 const product = ref(null);
@@ -177,8 +177,9 @@ const formatPrice = (val) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
 const fetchData = async () => {
   loading.value = true;
   try {
-    const res = await axios.get(`http://localhost:5158/api/ProductApi/${props.id}`);
-    product.value = res.data;
+    const res = await api.get(`/ProductApi/${props.id}`);
+    console.log("資料=>", res)
+    product.value = res;
     const saved = JSON.parse(localStorage.getItem("moshop_default_info"));
     if (saved) { orderForm.value = { ...saved }; saveDefault.value = true; }
   } catch (e) { console.error(e); } finally { loading.value = false; }
@@ -205,14 +206,14 @@ const submitOrder = async () => {
       ReceiverPhone: orderForm.value.receiverPhone,
       ReceiverAddress: fullAddress.value
     };
-    const res = await axios.post('http://localhost:5158/api/OrderApi/SubmitOrder', orderData);
-    if (res.data.success) {
+    const res = await api.post('/OrderApi/SubmitOrder', orderData);
+    if (res.success) {
       // 3. 顯示成功訊息
-      toast.add({ 
-        severity: 'success', 
-        summary: '下單成功', 
-        detail: '感謝您的購買！即將前往訂單列表...', 
-        life: 2000 
+      toast.add({
+        severity: 'success',
+        summary: '下單成功',
+        detail: '感謝您的購買！即將前往訂單列表...',
+        life: 2000
       });
 
       // 4. 關鍵修改：延遲 1.5 秒後跳轉，讓使用者看清楚 Toast 提示
@@ -228,11 +229,4 @@ const submitOrder = async () => {
 onMounted(fetchData);
 </script>
 
-<style scoped>
-/* 針對手機版的微調 */
-@media (max-width: 768px) {
-  .pr-md-4, .pl-md-4 {
-    padding: 0 !important;
-  }
-}
-</style>
+<style scoped></style>

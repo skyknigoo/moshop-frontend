@@ -1,11 +1,134 @@
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useToast } from 'primevue/usetoast';
+import { useConfirm } from 'primevue/useconfirm';
+import Select from 'primevue/select';
+import DatePicker from 'primevue/datepicker';
+import api from '@/api/axios';
+
+const router = useRouter();
+const toast = useToast();
+const confirm = useConfirm();
+
+const loading = ref(false);
+const products = ref([]);
+const categories = ref([]);
+const stats = ref({ totalCount: 0, availableCount: 0, lowStockCount: 0, frozenCount: 0 });
+const filters = ref({
+  startDate: null,
+  endDate: null,
+  groupId: null,
+  search: '',
+  page: 1
+})
+
+// 讀取商品資料
+const loadData = async () => {
+  loading.value = true;
+  try {
+    const res = await api.get('/manage/MProductApi', { params: filters.value });
+    products.value = res.items;
+    stats.value = res.stats;
+    categories.value = res.categories;
+  } catch (e) {
+    console.error(e)
+    toast.add({ severity: 'error', summary: '失敗', detail: '無法載入商品資料', life: 3000 });
+  } finally {
+    loading.value = false;
+  }
+}
+
+// 清空搜尋欄位
+const resetFilters = () => {
+  filters.value = { startDate: null, endDate: null, groupId: null, search: '', page: 1 };
+  loadData();
+};
+// 操作邏輯
+
+// 商品狀態顯示
+const getStatusLabel = (stats) => {
+  const map = { 0: '已下架', 1: '上架中', 2: '凍結中', 3: '庫存告急' };
+  return map[stats] || '未知';
+};
+const getStatusSeverity = (status) => {
+  const map = { 0: 'secondary', 1: 'success', 2: 'info', 3: 'warn' };
+  return map[status] || 'info';
+};
+
+const formatDate = (date) => new Date(date).toLocaleString();
+
+const onPageChange = (event) => {
+  filters.value.page = event.page + 1;
+  loadData();
+};
+
+// --- 確認對話框 (復刻 confirmFrozen 與 confirmDelete) ---
+// --- 凍結邏輯 ---
+const confirmFrozen = (product) => {
+  const isFrozen = product.status === 2;
+  const actionText = isFrozen ? '解凍' : '凍結';
+  confirm.require({
+    header: `確定要${actionText}該商品嗎？`,
+    message: `${actionText}後，該商品將${isFrozen ? '重新出現在前台' : '從前台隱藏'}。`,
+    icon: 'pi pi-info-circle',
+    acceptLabel: '確定',
+    rejectLabel: '取消',
+    acceptClass: isFrozen ? 'p-button-warn' : 'p-button-info',
+    accept: async () => {
+      try {
+        const res = await api.post(`/manage/MProductApi/Frozen/${product.productID}`);
+        if (res.success) {
+          toast.add({ severity: 'success', summary: '成功', detail: `商品已${actionText}`, life: 2000 });
+          loadData();
+        }
+      } catch (e) {
+        toast.add({ severity: 'error', summary: '失敗', detail: e.response?.message || '操作失敗', life: 3000 });
+      }
+    }
+  });
+}
+
+// ---刪除邏輯---
+const confirmDelete = (product) => {
+  confirm.require({
+    header: '確定要刪除嗎?',
+    message: '此動作無法復原,請確認商品資料',
+    icon: 'pi pi-exclamation-triangle',
+    acceptLabel: '確認刪除',
+    rejectLabel: '取消',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        const res = await api.post(`/manage/MProductApi/Delete/${product.productID}`);
+        if (res.success) {
+          toast.add({ severity: 'success', summary: '已刪除', detail: '商品已成功移除', life: 2000 });
+          loadData();
+        }
+      } catch (e) {
+        toast.add({ severity: 'error', summary: '刪除失敗', detail: e.response?.message || '無法刪除' });
+      }
+    }
+  })
+}
+
+
+
+
+onMounted(loadData);
+</script>
+
+
 <template>
   <div class="p-4 surface-ground min-h-screen">
     <Toast />
     <ConfirmDialog />
-
     <div class="flex justify-content-between align-items-center mb-4">
       <div>
-        <h2 class="text-3xl font-bold m-0 text-900">📦 商品管理</h2>
+        <h2 class="text-3xl font-bold m-0 text-900">
+          <i class="pi pi-shopping-bag mr-2 text-primary text-3xl"></i>
+          商品管理
+        </h2>
         <nav class="flex align-items-center gap-2 text-500 text-sm mt-2">
           <router-link to="/manage" class="no-underline text-500">控制台</router-link>
           <i class="pi pi-chevron-right text-xs"></i>
@@ -13,7 +136,7 @@
         </nav>
       </div>
       <PButton label="新增商品" icon="pi pi-plus" class="p-button-lg shadow-2"
-        @click="router.push('/manage/product/create')" />
+        @click="router.push('/manage/product/createMe')" />
     </div>
 
     <div class="grid mb-4">
@@ -108,7 +231,7 @@
           <template #body="{ data }">
             <div class="flex gap-2 justify-content-end">
               <PButton label="編輯" icon="pi pi-pencil" severity="primary" outlined size="small"
-                @click="router.push(`/manage/product/edit/${data.productID}`)" />
+                @click="router.push(`/manage/product/editMe/${data.productID}`)" />
 
               <PButton :label="data.status === 2 ? '解凍' : '凍結'"
                 :icon="data.status === 2 ? 'pi pi-unlock' : 'pi pi-lock'"
@@ -121,130 +244,17 @@
         </Column>
       </DataTable>
 
-      <Paginator :rows="10" :totalRecords="stats.totalCount" @page="onPageChange"
-        template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport"
-        currentPageReportTemplate="顯示第 {first} 到 {last} 筆，共 {totalRecords} 筆" />
+
+
+
+
+
+
+
+
+      <Paginator :rows="10" :totalRecords="stats.totalCount" @page="onPageChange" />
     </div>
+
+
   </div>
 </template>
-
-<script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
-import { useConfirm } from 'primevue/useconfirm';
-import Select from 'primevue/select';
-import DatePicker from 'primevue/datepicker';
-import api from '@/api/axios';
-
-const router = useRouter();
-const toast = useToast();
-const confirm = useConfirm();
-
-// --- 響應式狀態 ---
-const loading = ref(false);
-const products = ref([]);
-const categories = ref([]);
-const stats = ref({ totalCount: 0, availableCount: 0, lowStockCount: 0, frozenCount: 0 });
-const filters = ref({
-  startDate: null,
-  endDate: null,
-  groupId: null,
-  search: '',
-  page: 1
-});
-
-// --- 資料讀取 ---
-const loadData = async () => {
-  loading.value = true;
-  try {
-    // 呼叫後端 API，注意路徑需與後端對齊
-    const res = await api.get('/manage/MProductApi', { params: filters.value });
-    products.value = res.items;
-    stats.value = res.stats;
-    categories.value = res.categories;
-  } catch (e) {
-    console.error(e)
-    toast.add({ severity: 'error', summary: '失敗', detail: '無法載入商品資料', life: 3000 });
-  } finally {
-    loading.value = false;
-  }
-};
-
-const resetFilters = () => {
-  filters.value = { startDate: null, endDate: null, groupId: null, search: '', page: 1 };
-  loadData();
-};
-
-// --- 操作邏輯 ---
-const getStatusLabel = (status) => {
-  const map = { 0: '已下架', 1: '上架中', 2: '凍結中', 3: '庫存告急' };
-  return map[status] || '未知';
-};
-
-const getStatusSeverity = (status) => {
-  const map = { 0: 'secondary', 1: 'success', 2: 'info', 3: 'warn' };
-  return map[status] || 'info';
-};
-
-const formatDate = (date) => new Date(date).toLocaleString();
-
-const onPageChange = (event) => {
-  filters.value.page = event.page + 1;
-  loadData();
-};
-
-// --- 確認對話框 (復刻 confirmFrozen 與 confirmDelete) ---
-// --- 凍結邏輯 ---
-const confirmFrozen = (product) => {
-  const isFrozen = product.status === 2;
-  const actionText = isFrozen ? '解凍' : '凍結';
-
-  confirm.require({
-    header: `確定要${actionText}該商品嗎？`,
-    message: `${actionText}後，該商品將${isFrozen ? '重新出現在前台' : '從前台隱藏'}。`,
-    icon: 'pi pi-info-circle',
-    acceptLabel: '確定',
-    rejectLabel: '取消',
-    acceptClass: isFrozen ? 'p-button-warn' : 'p-button-info',
-    accept: async () => {
-      try {
-        // 修正路徑：api/manage/MProductApi
-        const res = await api.post(`/manage/MProductApi/Frozen/${product.productID}`);
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '成功', detail: `商品已${actionText}`, life: 2000 });
-          loadData(); // 重新整理列表
-        }
-      } catch (e) {
-        toast.add({ severity: 'error', summary: '失敗', detail: e.response?.message || '操作失敗', life: 3000 });
-      }
-    }
-  });
-};
-
-// --- 刪除邏輯 ---
-const confirmDelete = (product) => {
-  confirm.require({
-    header: '確定要刪除嗎？',
-    message: '此動作無法復原，請確認商品資料。',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: '是的，刪除它',
-    rejectLabel: '取消',
-    acceptClass: 'p-button-danger',
-    accept: async () => {
-      try {
-        // 修正路徑：api/manage/MProductApi
-        const res = await api.post(`/manage/MProductApi/Delete/${product.productID}`);
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '已刪除', detail: '商品已成功移除', life: 2000 });
-          loadData();
-        }
-      } catch (e) {
-        toast.add({ severity: 'error', summary: '刪除失敗', detail: e.response?.message || '無法刪除' });
-      }
-    }
-  });
-};
-
-onMounted(loadData);
-</script>

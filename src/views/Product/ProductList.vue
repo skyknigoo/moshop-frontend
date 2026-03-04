@@ -19,29 +19,30 @@
 
       <div class="col-12 md:col-9">
         <DataView :value="products" :layout="layout" :loading="loading" :paginator="totalPages > 1" :rows="10">
-          <template #grid="slotProps" >
-            <div class="grid grid-nogutter" >
+          <template #grid="slotProps">
+            <div class="grid grid-nogutter">
               <div v-for="(item, index) in slotProps.items" :key="index" class="col-12 sm:col-6 md:col-4 p-2">
-                <div @click="$router.push({ name: 'ProductDetails', params: { id: item.productID }})" class="p-4 border-1 surface-border surface-card border-round flex flex-column product-card h-full shadow-1">
+                <div @click="$router.push({ name: 'ProductDetails', params: { id: item.productID } })"
+                  class="p-4 border-1 surface-border surface-card border-round flex flex-column product-card h-full shadow-1">
                   <div class="relative">
-                    <img :src="item.imagePath || '/uploads/Comm/等待餵圖.png'" 
-                         class="w-full border-round" style="height: 200px; object-fit: cover" />
+                    <img :src="item.imagePath || '/uploads/Comm/等待餵圖.png'" class="w-full border-round"
+                      style="height: 200px; object-fit: cover" />
                     <Tag :value="item.groupName" severity="secondary" class="absolute top-0 left-0 m-2"></Tag>
                   </div>
-                  <div class="flex flex-column justify-content-between flex-1 mt-3" >
+                  <div class="flex flex-column justify-content-between flex-1 mt-3">
                     <div>
                       <div class="text-xl font-bold text-900 mb-2 truncate">{{ item.productName }}</div>
                     </div>
                     <div class="flex align-items-center justify-content-between mt-3">
                       <span class="text-2xl font-semibold text-danger">{{ formatPrice(item.productPrice) }}</span>
-               
+
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </template>
-          
+
           <template #empty>
             <div class="text-center py-8">
               <i class="pi pi-search-minus text-6xl text-400 mb-4" />
@@ -84,9 +85,9 @@ const categoryMenuItems = computed(() => {
     { label: '全部商品', icon: 'pi pi-list', command: () => selectCategory(null) }
   ];
   categories.value.forEach(c => {
-    items.push({ 
-      label: c.groupName, 
-      command: () => selectCategory(c.groupID) 
+    items.push({
+      label: c.groupName,
+      command: () => selectCategory(c.groupID)
     });
   });
   return items;
@@ -97,25 +98,25 @@ const fetchData = async () => {
   try {
     // 確保後端專案有在執行，且網址正確
     const res = await axios.get('http://localhost:5158/api/ProductApi', {
-      params: { 
-        search: searchQuery.value, 
-        groupId: selectedGroupId.value 
+      params: {
+        search: searchQuery.value,
+        groupId: selectedGroupId.value
       }
     });
-    
+
     // 這裡要對應你 ProductApiController.cs 回傳的 Ok(new { ... })
-    products.value = res.data.items || []; 
+    products.value = res.data.items || [];
     categories.value = res.data.categories || [];
     totalPages.value = res.data.totalPages || 1;
-    
+
     console.log("資料抓取成功:", res.data); // 除錯用
-  } catch (e) { 
-    console.error("API 請求發生錯誤:", e.message); 
+  } catch (e) {
+    console.error("API 請求發生錯誤:", e.message);
     if (e.response) {
-       console.error("伺服器回傳狀態碼:", e.response.status);
+      console.error("伺服器回傳狀態碼:", e.response.status);
     }
-  } finally { 
-    loading.value = false; 
+  } finally {
+    loading.value = false;
   }
 };
 

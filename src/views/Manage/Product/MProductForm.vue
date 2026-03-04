@@ -13,7 +13,8 @@
           <span class="text-900 font-medium">商品表單</span>
         </nav>
       </div>
-      <PButton label="返回列表" icon="pi pi-arrow-left" severity="secondary" outlined @click="router.push('/manage/product')" />
+      <PButton label="返回列表" icon="pi pi-arrow-left" severity="secondary" outlined
+        @click="router.push('/manage/product')" />
     </div>
 
     <div class="grid">
@@ -40,13 +41,13 @@
           <template #title>商品主圖</template>
           <template #content>
             <div class="text-center mb-4 p-3 surface-100 border-round-xl">
-              <img :src="imagePreview || product.imagePath || '/uploads/Comm/等待餵圖.png'" 
-                   class="border-round shadow-2 bg-white" 
-                   style="max-height: 450px; width: 80%; object-fit: cover;" />
+              <img :src="imagePreview || product.imagePath || '/uploads/Comm/等待餵圖.png'"
+                class="border-round shadow-2 bg-white" style="max-height: 450px; width: 80%; object-fit: cover;" />
             </div>
             <div class="flex flex-column gap-2">
               <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
-              <PButton label="更換商品圖片" icon="pi pi-upload" severity="info" class="w-full" @click="$refs.fileInput.click()" />
+              <PButton label="更換商品圖片" icon="pi pi-upload" severity="info" class="w-full"
+                @click="$refs.fileInput.click()" />
               <p class="text-center text-500 text-xs mt-2">支援 JPG, PNG 格式，建議正方形比例以獲得最佳顯示效果</p>
             </div>
           </template>
@@ -60,18 +61,18 @@
             <div class="flex flex-column gap-4 p-fluid">
               <div class="flex flex-column gap-2">
                 <label class="font-bold text-700">* 商品類別</label>
-                <PSelect v-model="product.productGroup" :options="categories" 
-                        optionLabel="groupName" optionValue="groupID" placeholder="請選擇分類" />
+                <PSelect v-model="product.productGroup" :options="categories" optionLabel="groupName"
+                  optionValue="groupID" placeholder="請選擇分類" />
               </div>
 
               <div class="flex flex-column gap-2">
                 <label class="font-bold text-700">* 銷售價格 (TWD)</label>
-                <InputNumber v-model="product.productPrice"  currency="TWD" locale="zh-TW" :min="0" />
+                <InputNumber v-model="product.productPrice" currency="TWD" locale="zh-TW" :min="0" />
               </div>
 
               <div class="flex flex-column gap-2">
                 <label class="font-bold text-700">* 現有庫存</label>
-                <InputNumber v-model="product.stockQty" showButtons :min="0"  />
+                <InputNumber v-model="product.stockQty" showButtons :min="0" />
               </div>
 
               <template v-if="isEdit">
@@ -88,8 +89,8 @@
               </template>
 
               <Divider />
-              <PButton label="確認儲存商品" icon="pi pi-check-circle" severity="success" size="large" 
-                       :loading="isSaving" @click="handleSubmit" class="p-3 font-bold" />
+              <PButton label="確認儲存商品" icon="pi pi-check-circle" severity="success" size="large" :loading="isSaving"
+                @click="handleSubmit" class="p-3 font-bold" />
               <PButton label="取消並返回" severity="secondary" text @click="router.push('/manage/product')" />
             </div>
           </template>
@@ -136,12 +137,12 @@ const initData = async () => {
   try {
     // 優先讀取分類 API
     const catRes = await axios.get('http://localhost:5158/api/manage/MProductApi/Categories');
-    categories.value = catRes.data;
+    categories.value = catRes;
 
     if (isEdit.value) {
       // 編輯模式：讀取單一商品資料
       const res = await axios.get(`http://localhost:5158/api/manage/MProductApi/${route.params.id}`);
-      product.value = res.data.product;
+      product.value = res.product;
     }
   } catch (e) {
     console.error(e)
@@ -178,7 +179,7 @@ const handleSubmit = async () => {
   formData.append('ProductPrice', product.value.productPrice);
   formData.append('StockQty', product.value.stockQty);
   formData.append('Status', product.value.status);
-  
+
   // 處理時間與路徑 (編輯模式重要)
   if (product.value.imagePath) formData.append('ImagePath', product.value.imagePath);
   if (product.value.createdAt) formData.append('CreatedAt', product.value.createdAt);
@@ -217,8 +218,16 @@ onMounted(initData);
 .container {
   animation: fadeIn 0.4s ease-in-out;
 }
+
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

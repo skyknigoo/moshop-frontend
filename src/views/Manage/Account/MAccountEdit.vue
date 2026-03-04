@@ -1,7 +1,7 @@
 <template>
   <div class="container py-5" style="max-width: 800px; margin: 0 auto;">
     <Toast />
-    
+
     <Card class="shadow-3 border-none overflow-hidden">
       <template #header>
         <div class="bg-blue-600 text-white p-4 flex align-items-center">
@@ -37,13 +37,8 @@
 
           <div class="col-12 md:col-6 field">
             <label class="font-bold block mb-2">權限設定</label>
-            <PSelect 
-              v-model="form.permissions" 
-              :options="filteredRoles" 
-              optionLabel="label" 
-              optionValue="value" 
-              placeholder="請選擇權限"
-            />
+            <PSelect v-model="form.permissions" :options="filteredRoles" optionLabel="label" optionValue="value"
+              placeholder="請選擇權限" />
             <div v-if="authStore.currentUserLevel < 4" class="mt-2 text-500 text-xs">
               <i class="pi pi-info-circle mr-1"></i> 只有系統開發者可以指派系統管理員權限。
             </div>
@@ -67,8 +62,8 @@
         <Divider />
         <div class="flex justify-content-end gap-3 px-3 pb-3">
           <PButton label="取消返回" severity="secondary" text @click="router.push('/manage/account')" />
-          <PButton label="儲存修改" severity="primary" icon="pi pi-save" 
-                   :loading="isSaving" @click="handleUpdate" class="px-4 shadow-2" />
+          <PButton label="儲存修改" severity="primary" icon="pi pi-save" :loading="isSaving" @click="handleUpdate"
+            class="px-4 shadow-2" />
         </div>
       </template>
     </Card>
@@ -78,7 +73,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import axios from 'axios';
+import api from '@/api/axios';
 import { useToast } from 'primevue/usetoast';
 import { useAuthStore } from '@/stores/auth'; // 引用你的 auth.js
 import { useVuelidate } from '@vuelidate/core';
@@ -107,8 +102,8 @@ const form = ref({
 const rules = {
   memberName: { required },
   email: { required, email },
-  confirmPassword: { 
-    sameAsPassword: sameAs(computed(() => form.value.password)) 
+  confirmPassword: {
+    sameAsPassword: sameAs(computed(() => form.value.password))
   }
 };
 const v$ = useVuelidate(rules, form);
@@ -131,15 +126,15 @@ const filteredRoles = computed(() => {
 const initData = async () => {
   try {
     const accountId = route.params.account;
-    const res = await axios.get(`http://localhost:5158/api/manage/MAccountApi/${accountId}`, {
+    const res = await api.get(`/manage/MAccountApi/${accountId}`, {
       withCredentials: true
     });
-    
+
     // 將後端回傳資料填入表單
-    form.value.account = res.data.account;
-    form.value.memberName = res.data.memberName;
-    form.value.email = res.data.email;
-    form.value.permissions = res.data.permissions;
+    form.value.account = res.account;
+    form.value.memberName = res.memberName;
+    form.value.email = res.email;
+    form.value.permissions = res.permissions;
     form.value.password = ''; // 密碼欄位預設清空
   } catch (err) {
     console.error(err)
@@ -161,12 +156,12 @@ const handleUpdate = async () => {
   isSaving.value = true;
   try {
     // 發送 PUT 請求至 api/manage/MAccountApi/{account}
-    const res = await axios.put(`http://localhost:5158/api/manage/MAccountApi/${form.value.account}`, form.value, {
+    const res = await api.put(`/manage/MAccountApi/${form.value.account}`, form.value, {
       withCredentials: true
     });
 
-    if (res.data.success) {
-      toast.add({ severity: 'success', summary: '成功', detail: res.data.message, life: 2000 });
+    if (res.success) {
+      toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 2000 });
       setTimeout(() => router.push('/manage/account'), 1500);
     }
   } catch (err) {

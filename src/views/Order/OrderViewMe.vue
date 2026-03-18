@@ -1,99 +1,120 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { onMounted, ref } from 'vue';
 import api from '@/api/axios';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 
-const confirm = useConfirm();
+// --- 2. 定義型別介面 (對應你的後端 PascalCase 欄位) ---
+interface OrderProduct {
+    productName: string;
+    imagePath: string | null;
+    productPrice: number;
+}
 
-const loading = ref(false);
-const orders = ref([]);
-const searchQuery = ref('');
-const selectedStatus = ref(null);
-const currentPage = ref(1);
-const totalRecords = ref(0);
+interface Order {
+    orderID: number;
+    orderQty: number;
+    totalPrice: number;
+    status: number;
+    orderDate: string;
+    shipmentDate: string | null;
+    finishDate: string | null;
+    returnStoreDate: string | null;
+    product: OrderProduct | null;
+}
+
+const confirm = useConfirm();
 const toast = useToast();
 
-const formatPrice = (val) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
-const formatDate = (dateStr) => {
-  if (!dateStr || dateStr.startsWith('0001')) return '-';
-  return new Date(dateStr).toLocaleString('zh-TW', { hour12: false });
+const loading = ref(false);
+const orders = ref<Order[]>([]); // 3. 標註為 Order 陣列
+const searchQuery = ref('');
+const selectedStatus = ref<number | null>(null);
+const currentPage = ref(1);
+const totalRecords = ref(0);
+
+// 格式化價格與日期 (加上型別標註)
+const formatPrice = (val: number | undefined) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
+const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr || dateStr.startsWith('0001')) return '-';
+    return new Date(dateStr).toLocaleString('zh-TW', { hour12: false });
 };
 
-//Tab設定
+// Tab 設定 (加上型別)
 const statusOptions = [
-  { label: '全部', value: null },
-  { label: '處理中', value: 0 },
-  { label: '寄送中', value: 1 },
-  { label: '已完成', value: 2 },
-  { label: '已退貨', value: 4 },
+    { label: '全部', value: null },
+    { label: '處理中', value: 0 },
+    { label: '寄送中', value: 1 },
+    { label: '已完成', value: 2 },
+    { label: '已退貨', value: 4 },
 ];
 
 // 狀態樣式變化
-const getStatusLabel = (status) => statusOptions.find(o => o.value === status)?.label || '未知';
-const getStatusSeverity = (status) => {
-  const map = { 0: 'warn', 1: 'info', 2: 'success', 3: 'danger' };
-  return map[status] || 'secondary';
+const getStatusLabel = (status: number) => statusOptions.find(o => o.value === status)?.label || '未知';
+const getStatusSeverity = (status: number): "warn" | "info" | "success" | "danger" | "secondary" => {
+    const map: Record<number, "warn" | "info" | "success" | "danger"> = {
+        0: 'warn', 1: 'info', 2: 'success', 3: 'danger'
+    };
+    return map[status] || 'secondary';
 };
 
-
-//取得訂單資料
+// 取得訂單資料 (保持原本 API 與邏輯)
 const fetchOrders = async (page = 1) => {
-  loading.value = true;
-  currentPage.value = page;
-  try {
-    const params = {
-      page: page,
-      search: searchQuery.value,
-      status: selectedStatus.value
-    };
+    loading.value = true;
+    currentPage.value = page;
+    try {
+        const params = {
+            page: page,
+            search: searchQuery.value,
+            status: selectedStatus.value
+        };
 
-    const res = await api.get('/OrderApi', { params });
-    console.log("取得資料=>", res)
-    orders.value = res.items;
-    totalRecords.value = res.pagination.totalCount;
-  } catch (e) {
-    console.log(e)
-    toast.add({ severity: 'error', summary: '連線錯誤', detail: '無法讀取訂單清單', life: 3000 })
-  } finally {
-    loading.value = false;
-  }
+        const res: any = await api.get('/OrderApi', { params });
+        console.log("取得資料=>", res)
+
+        // 根據你 API 的回傳結構賦值
+        orders.value = res.items || [];
+        totalRecords.value = res.pagination?.totalCount || 0;
+    } catch (e) {
+        console.log(e)
+        toast.add({ severity: 'error', summary: '連線錯誤', detail: '無法讀取訂單清單', life: 3000 })
+    } finally {
+        loading.value = false;
+    }
 }
 
 // 搜尋 頁數 操作
-const onPageChange = (event) => fetchOrders(event.page + 1);
+const onPageChange = (event: any) => fetchOrders(event.page + 1);
 const handleFilterChange = () => fetchOrders(1);
 
 // 訂單狀態操作 (完成/退貨)
-const confirmUpdate = (orderId, action) => {
-  const isComplate = action === 'CompleteOrder';
-  confirm.require({
-    header: '訂單操作確認',
-    message: isComplate ? '您是否已收到商品並確認完成訂單？' : '確定要對此訂單提出退貨申請嗎？',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: '確定',
-    rejectLabel: '我再想想',
-    acceptClass: 'p-button-success',
-    rejectClass: 'p-button-danger',
-    accept: async () => {
-      try {
-        const res = await api.post(`/OrderApi/${action}/${orderId}`);
-        console.log("看=>", res)
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '操作成功', detail: res.message, life: 3000 });
-          fetchOrders(currentPage.value);
+const confirmUpdate = (orderId: number, action: 'CompleteOrder' | 'ReturnOrder') => {
+    const isComplate = action === 'CompleteOrder';
+    confirm.require({
+        header: '訂單操作確認',
+        message: isComplate ? '您是否已收到商品並確認完成訂單？' : '確定要對此訂單提出退貨申請嗎？',
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: '確定',
+        rejectLabel: '我再想想',
+        acceptClass: 'p-button-success',
+        rejectClass: 'p-button-danger',
+        accept: async () => {
+            try {
+                const res: any = await api.post(`/OrderApi/${action}/${orderId}`);
+                if (res.success) {
+                    toast.add({ severity: 'success', summary: '操作成功', detail: res.message, life: 3000 });
+                    fetchOrders(currentPage.value);
+                }
+            } catch (e: any) {
+                console.log("錯誤資訊=>", e)
+                toast.add({ severity: 'error', summary: '操作失敗', detail: e.response?.data?.message || '系統異常' });
+            }
         }
-      } catch (e) {
-        console.log("錯誤資訊=>", e)
-        toast.add({ severity: 'error', summary: '操作失敗', detail: e.response?.message || '系統異常' });
-      }
-    }
-  })
+    })
 }
 
 onMounted(() => fetchOrders(1));
 </script>
-
 
 <template>
   <Toast />
@@ -107,7 +128,6 @@ onMounted(() => fetchOrders(1));
         <div class="col-12 lg:col-8">
           <SelectButton @change="handleFilterChange" v-model="selectedStatus" :options="statusOptions"
             optionLabel="label" optionValue="value" />
-
         </div>
         <div class="col-12 lg:col-4">
           <div class="p-inputgroup">
@@ -123,7 +143,7 @@ onMounted(() => fetchOrders(1));
       <DataTable :value="orders" :loading="loading" responsiveLayout="stack" breakpoint="960px"
         class="p-datatable-sm p-3">
         <Column header="商品資訊">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: Order }">
             <div class="flex align-items-center gap-3">
               <PImage :src="data.product?.imagePath || '/uploads/Comm/等待餵圖.png'" width="70"
                 imageClass="border-round shadow-1" />
@@ -135,18 +155,18 @@ onMounted(() => fetchOrders(1));
           </template>
         </Column>
         <Column header="單價">
-          <template #body="{ data }"> {{ formatPrice(data.product?.productPrice) }} </template>
+          <template #body="{ data }: { data: Order }"> {{ formatPrice(data.product?.productPrice) }} </template>
         </Column>
         <Column header="數量">
-          <template #body="{ data }"> x {{ data.orderQty }} </template>
+          <template #body="{ data }: { data: Order }"> x {{ data.orderQty }} </template>
         </Column>
         <Column header="總計">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: Order }">
             <span class="font-bold text-danger text-lg">{{ formatPrice(data.totalPrice) }}</span>
           </template>
         </Column>
         <Column header="狀態/時間">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: Order }">
             <Tag :value="getStatusLabel(data.status)" :severity="getStatusSeverity(data.status)" class="mb-2 px-3" />
             <div class="text-xs text-600 line-height-3">
               <div v-if="data.status === 0"><i class="pi pi-clock mr-1"></i>下單 {{ formatDate(data.orderDate) }}</div>
@@ -155,7 +175,6 @@ onMounted(() => fetchOrders(1));
               </div>
               <div v-if="data.status === 4"><i class="pi pi-exclamation-circle mr-1"></i>退貨
                 {{ formatDate(data.returnStoreDate) }}</div>
-
             </div>
             <div v-if="data.status === 1" class="flex gap-2 mt-2">
               <PButton label="完成訂單" icon="pi pi-check" severity="success" size="small"
@@ -164,14 +183,12 @@ onMounted(() => fetchOrders(1));
                 @click="confirmUpdate(data.orderID, 'ReturnOrder')" />
             </div>
           </template>
-
         </Column>
       </DataTable>
 
       <div class="p-3 border-top-1 surface-border bg-white">
         <Paginator :rows="10" :totalRecords="totalRecords" :first="(currentPage - 1) * 10" @page="onPageChange" />
       </div>
-
     </div>
   </div>
 </template>

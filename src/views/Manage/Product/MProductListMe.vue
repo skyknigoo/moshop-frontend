@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
@@ -7,117 +7,148 @@ import Select from 'primevue/select';
 import DatePicker from 'primevue/datepicker';
 import api from '@/api/axios';
 
+// --- 2. 定義後台管理專用介面 ---
+interface MProductStats {
+    totalCount: number;
+    availableCount: number;
+    lowStockCount: number;
+    frozenCount: number;
+}
+
+interface MProductCategory {
+    groupID: number;
+    groupName: string;
+}
+
+interface MProductItem {
+    productID: number;
+    productName: string;
+    productPrice: number;
+    stockQty: number;
+    status: number;
+    updatedAt: string;
+    imagePath: string | null;
+    group: {
+        groupName: string;
+    };
+}
+
+interface MProductFilters {
+    startDate: Date | null;
+    endDate: Date | null;
+    groupId: number | null;
+    search: string;
+    page: number;
+}
+
 const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 
 const loading = ref(false);
-const products = ref([]);
-const categories = ref([]);
-const stats = ref({ totalCount: 0, availableCount: 0, lowStockCount: 0, frozenCount: 0 });
-const filters = ref({
-  startDate: null,
-  endDate: null,
-  groupId: null,
-  search: '',
-  page: 1
+const products = ref<MProductItem[]>([]);
+const categories = ref<MProductCategory[]>([]);
+const stats = ref<MProductStats>({ totalCount: 0, availableCount: 0, lowStockCount: 0, frozenCount: 0 });
+const filters = ref<MProductFilters>({
+    startDate: null,
+    endDate: null,
+    groupId: null,
+    search: '',
+    page: 1
 })
 
-// 讀取商品資料
+// 讀取商品資料 (維持原 API 邏輯)
 const loadData = async () => {
-  loading.value = true;
-  try {
-    const res = await api.get('/manage/MProductApi', { params: filters.value });
-    products.value = res.items;
-    stats.value = res.stats;
-    categories.value = res.categories;
-  } catch (e) {
-    console.error(e)
-    toast.add({ severity: 'error', summary: '失敗', detail: '無法載入商品資料', life: 3000 });
-  } finally {
-    loading.value = false;
-  }
+    loading.value = true;
+    try {
+        const res: any = await api.get('/manage/MProductApi', { params: filters.value });
+        products.value = res.items || [];
+        stats.value = res.stats || { totalCount: 0, availableCount: 0, lowStockCount: 0, frozenCount: 0 };
+        categories.value = res.categories || [];
+    } catch (e) {
+        console.error(e)
+        toast.add({ severity: 'error', summary: '失敗', detail: '無法載入商品資料', life: 3000 });
+    } finally {
+        loading.value = false;
+    }
 }
 
 // 清空搜尋欄位
 const resetFilters = () => {
-  filters.value = { startDate: null, endDate: null, groupId: null, search: '', page: 1 };
-  loadData();
-};
-// 操作邏輯
-
-// 商品狀態顯示
-const getStatusLabel = (stats) => {
-  const map = { 0: '已下架', 1: '上架中', 2: '凍結中', 3: '庫存告急' };
-  return map[stats] || '未知';
-};
-const getStatusSeverity = (status) => {
-  const map = { 0: 'secondary', 1: 'success', 2: 'info', 3: 'warn' };
-  return map[status] || 'info';
+    filters.value = { startDate: null, endDate: null, groupId: null, search: '', page: 1 };
+    loadData();
 };
 
-const formatDate = (date) => new Date(date).toLocaleString();
-
-const onPageChange = (event) => {
-  filters.value.page = event.page + 1;
-  loadData();
+// 商品狀態顯示 (標註 status 型別)
+const getStatusLabel = (status: number) => {
+    const map: Record<number, string> = { 0: '已下架', 1: '上架中', 2: '凍結中', 3: '庫存告急' };
+    return map[status] || '未知';
 };
 
-// --- 確認對話框 (復刻 confirmFrozen 與 confirmDelete) ---
-// --- 凍結邏輯 ---
-const confirmFrozen = (product) => {
-  const isFrozen = product.status === 2;
-  const actionText = isFrozen ? '解凍' : '凍結';
-  confirm.require({
-    header: `確定要${actionText}該商品嗎？`,
-    message: `${actionText}後，該商品將${isFrozen ? '重新出現在前台' : '從前台隱藏'}。`,
-    icon: 'pi pi-info-circle',
-    acceptLabel: '確定',
-    rejectLabel: '取消',
-    acceptClass: isFrozen ? 'p-button-warn' : 'p-button-info',
-    accept: async () => {
-      try {
-        const res = await api.post(`/manage/MProductApi/Frozen/${product.productID}`);
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '成功', detail: `商品已${actionText}`, life: 2000 });
-          loadData();
+const getStatusSeverity = (status: number): "secondary" | "success" | "info" | "warn" => {
+    const map: Record<number, "secondary" | "success" | "info" | "warn"> = {
+        0: 'secondary', 1: 'success', 2: 'info', 3: 'warn'
+    };
+    return map[status] || 'info';
+};
+
+const formatDate = (date: string) => date ? new Date(date).toLocaleString() : '-';
+
+const onPageChange = (event: any) => {
+    filters.value.page = event.page + 1;
+    loadData();
+};
+
+// --- 凍結邏輯 (加上型別標註) ---
+const confirmFrozen = (product: MProductItem) => {
+    const isFrozen = product.status === 2;
+    const actionText = isFrozen ? '解凍' : '凍結';
+    confirm.require({
+        header: `確定要${actionText}該商品嗎？`,
+        message: `${actionText}後，該商品將${isFrozen ? '重新出現在前台' : '從前台隱藏'}。`,
+        icon: 'pi pi-info-circle',
+        acceptLabel: '確定',
+        rejectLabel: '取消',
+        acceptClass: isFrozen ? 'p-button-warn' : 'p-button-info',
+        accept: async () => {
+            try {
+                const res: any = await api.post(`/manage/MProductApi/Frozen/${product.productID}`);
+                if (res.success) {
+                    toast.add({ severity: 'success', summary: '成功', detail: `商品已${actionText}`, life: 2000 });
+                    loadData();
+                }
+            } catch (e: any) {
+                toast.add({ severity: 'error', summary: '失敗', detail: e.response?.data?.message || '操作失敗', life: 3000 });
+            }
         }
-      } catch (e) {
-        toast.add({ severity: 'error', summary: '失敗', detail: e.response?.message || '操作失敗', life: 3000 });
-      }
-    }
-  });
+    });
 }
 
-// ---刪除邏輯---
-const confirmDelete = (product) => {
-  confirm.require({
-    header: '確定要刪除嗎?',
-    message: '此動作無法復原,請確認商品資料',
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: '確認刪除',
-    rejectLabel: '取消',
-    acceptClass: 'p-button-danger',
-    accept: async () => {
-      try {
-        const res = await api.post(`/manage/MProductApi/Delete/${product.productID}`);
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '已刪除', detail: '商品已成功移除', life: 2000 });
-          loadData();
+// --- 刪除邏輯 ---
+const confirmDelete = (product: MProductItem) => {
+    confirm.require({
+        header: '確定要刪除嗎?',
+        message: '此動作無法復原,請確認商品資料',
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: '確認刪除',
+        rejectLabel: '取消',
+        acceptClass: 'p-button-danger',
+        accept: async () => {
+            try {
+                const res: any = await api.post(`/manage/MProductApi/Delete/${product.productID}`);
+                if (res.success) {
+                    toast.add({ severity: 'success', summary: '已刪除', detail: '商品已成功移除', life: 2000 });
+                    loadData();
+                }
+            } catch (e: any) {
+                toast.add({ severity: 'error', summary: '刪除失敗', detail: e.response?.data?.message || '無法刪除' });
+            }
         }
-      } catch (e) {
-        toast.add({ severity: 'error', summary: '刪除失敗', detail: e.response?.message || '無法刪除' });
-      }
-    }
-  })
+    })
 }
-
-
-
 
 onMounted(loadData);
 </script>
-
 
 <template>
   <div class="p-4 surface-ground min-h-screen">
@@ -198,37 +229,37 @@ onMounted(loadData);
       <DataTable :value="products" :loading="loading" responsiveLayout="scroll" :rows="10" class="p-datatable-sm"
         hoverSelection>
         <Column header="商品縮圖" class="pl-4">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MProductItem }">
             <PImage :src="data.imagePath || '/uploads/Comm/等待餵圖.png'" width="60" class="shadow-1 border-round"
               preview />
           </template>
         </Column>
         <Column header="商品名稱">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MProductItem }">
             <div class="font-bold text-900">{{ data.productName }}</div>
             <small class="text-500">ID: {{ data.productID }}</small>
           </template>
         </Column>
         <Column field="group.groupName" header="分類" />
         <Column header="價格" class="font-bold text-primary">
-          <template #body="{ data }">NT$ {{ data.productPrice.toLocaleString() }}</template>
+          <template #body="{ data }: { data: MProductItem }">NT$ {{ data.productPrice.toLocaleString() }}</template>
         </Column>
         <Column header="庫存">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MProductItem }">
             <span :class="{ 'text-danger font-bold': data.stockQty <= 3 }">{{ data.stockQty }}</span>
             <small class="text-500 ml-1">/ 件</small>
           </template>
         </Column>
         <Column header="狀態">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MProductItem }">
             <Tag :value="getStatusLabel(data.status)" :severity="getStatusSeverity(data.status)" rounded />
           </template>
         </Column>
         <Column header="最後修改時間">
-          <template #body="{ data }">{{ formatDate(data.updatedAt) }}</template>
+          <template #body="{ data }: { data: MProductItem }">{{ formatDate(data.updatedAt) }}</template>
         </Column>
         <Column header="操作" class="text-right pr-4" style="min-width: 250px">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MProductItem }">
             <div class="flex gap-2 justify-content-end">
               <PButton label="編輯" icon="pi pi-pencil" severity="primary" outlined size="small"
                 @click="router.push(`/manage/product/editMe/${data.productID}`)" />
@@ -244,17 +275,9 @@ onMounted(loadData);
         </Column>
       </DataTable>
 
-
-
-
-
-
-
-
-
       <Paginator :rows="10" :totalRecords="stats.totalCount" @page="onPageChange" />
     </div>
-
-
   </div>
 </template>
+
+<style scoped></style>

@@ -1,11 +1,26 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/api/axios';
 import { useToast } from 'primevue/usetoast';
-import { useAuthStore } from '@/stores/auth'; // 引用你的 auth.js
+import { useAuthStore } from '@/stores/auth';
 import { useVuelidate } from '@vuelidate/core';
 import { required, email, sameAs } from '@vuelidate/validators';
+
+// --- 2. 定義型別介面 ---
+interface Role {
+    label: string;
+    value: number;
+}
+
+interface AccountForm {
+    account: string;
+    memberName: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    permissions: number | null;
+}
 
 const route = useRoute();
 const router = useRouter();
@@ -16,85 +31,86 @@ const loading = ref(true);
 const isSaving = ref(false);
 const currentTime = ref(new Date().toLocaleString());
 
-const allRoles = [
-  { label: '一般會員', value: 1 },
-  { label: '特約店家', value: 2 },
-  { label: '管理員', value: 3 },
-  { label: '系統開發者', value: 4 }
+const allRoles: Role[] = [
+    { label: '一般會員', value: 1 },
+    { label: '特約店家', value: 2 },
+    { label: '管理員', value: 3 },
+    { label: '系統開發者', value: 4 }
 ];
 
 const filteredRoles = computed(() => {
-  // 讀取當前管理員的數字等級
-  const currentLevel = authStore.currentUserLevel;
-  return allRoles.filter(role => role.value > 0 && role.value <= currentLevel);
+    // 讀取當前管理員的數字等級 (假設 authStore 已定義該屬性)
+    const currentLevel = (authStore as any).currentUserLevel || 0;
+    return allRoles.filter(role => role.value > 0 && role.value <= currentLevel);
 });
 
-
-// 表單結構
-const form = ref({
-  account: '',
-  memberName: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  permissions: null
+// 表單結構型別標註
+const form = ref<AccountForm>({
+    account: '',
+    memberName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    permissions: null
 })
 
-//  驗證規則 (密碼不改則不驗證，但若輸入則需一致)
+// 驗證規則
 const rules = {
-  memberName: { required },
-  email: { required, email },
-  confirmPassword: {
-    sameAsPassword: sameAs(computed(() => form.value.password))
-  }
+    memberName: { required },
+    email: { required, email },
+    confirmPassword: {
+        sameAsPassword: sameAs(computed(() => form.value.password))
+    }
 };
-const v$ = useVuelidate(rules, form);
 
+// Vuelidate 在 TS 下通常能自動推導
+const v$ = useVuelidate(rules, form);
 
 // 取得使用者資料
 const initData = async () => {
-  try {
-    const accountId = route.params.account;
-    const res = await api.get(`/manage/MAccountApi/${accountId}`, {
-      withCredentials: true
-    });
+    try {
+        const accountId = route.params.account as string;
+        const res: any = await api.get(`/manage/MAccountApi/${accountId}`, {
+            withCredentials: true
+        });
 
-    // 將後端回傳資料填入表單
-    form.value.account = res.account;
-    form.value.memberName = res.memberName;
-    form.value.email = res.email;
-    form.value.permissions = res.permissions;
-    form.value.password = ''; // 密碼欄位預設清空
-  } catch (err) {
-    console.error(err)
-    toast.add({ severity: 'error', summary: '錯誤', detail: '無法獲取該帳號資料' });
-    router.push('/manage/account');
-  } finally {
-    loading.value = false;
-  }
+        // 將後端回傳資料填入表單 (維持原本對接邏輯)
+        form.value.account = res.account;
+        form.value.memberName = res.memberName;
+        form.value.email = res.email;
+        form.value.permissions = res.permissions;
+        form.value.password = ''; // 密碼欄位預設清空
+    } catch (err) {
+        console.error(err)
+        toast.add({ severity: 'error', summary: '錯誤', detail: '無法獲取該帳號資料' });
+        router.push('/manage/accountMe'); // 修正跳轉路徑一致性
+    } finally {
+        loading.value = false;
+    }
 };
 
 // 更新資料
 const handleUpdate = async () => {
-  isSaving.value = true;
-  try {
-    const res = await api.put(`/manage/MAccountApi/${form.value.account}`, form.value, { withCredentials: true });
-    if (res.success) {
-      toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 2000 });
-      setTimeout(() => router.push('/manage/accountMe'), 1500);
-    }
-  } catch (err) {
-    const errorMsg = err.response?.data?.message || '資料更新失敗';
-    toast.add({ severity: 'error', summary: '更新失敗', detail: errorMsg });
-  } finally {
-    isSaving.value = false;
-  }
+    // 執行驗證檢查
+    const isFormCorrect = await v$.value.$validate();
+    if (!isFormCorrect) return;
 
+    isSaving.value = true;
+    try {
+        const res: any = await api.put(`/manage/MAccountApi/${form.value.account}`, form.value, { withCredentials: true });
+        if (res.success) {
+            toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 2000 });
+            setTimeout(() => router.push('/manage/accountMe'), 1500);
+        }
+    } catch (err: any) {
+        const errorMsg = err.response?.data?.message || '資料更新失敗';
+        toast.add({ severity: 'error', summary: '更新失敗', detail: errorMsg });
+    } finally {
+        isSaving.value = false;
+    }
 }
 
-
 onMounted(initData);
-
 </script>
 
 <template>
@@ -137,7 +153,7 @@ onMounted(initData);
             <label class="font-bold block mb-2">權限設定</label>
             <PSelect v-model="form.permissions" :options="filteredRoles" optionLabel="label" optionValue="value"
               placeholder="請選擇權限" />
-            <div v-if="authStore.currentUserLevel < 4" class="mt-2 text-500 text-xs">
+            <div v-if="(authStore as any).currentUserLevel < 4" class="mt-2 text-500 text-xs">
               <i class="pi pi-info-circle mr-1"></i> 只有系統開發者可以指派系統管理員權限。
             </div>
           </div>
@@ -150,7 +166,7 @@ onMounted(initData);
 
         <div class="mt-4 p-3 surface-100 border-round text-500 text-xs">
           <div class="flex justify-content-between">
-            <span>最後修改人員：{{ authStore.user?.account }} (當前登入)</span>
+            <span>最後修改人員：{{ authStore.user?.name }} (當前登入)</span>
             <span>最後修改時間：{{ currentTime }}</span>
           </div>
         </div>
@@ -159,7 +175,7 @@ onMounted(initData);
       <template #footer>
         <Divider />
         <div class="flex justify-content-end gap-3 px-3 pb-3">
-          <PButton label="取消返回" severity="secondary" text @click="router.push('/manage/account')" />
+          <PButton label="取消返回" severity="secondary" text @click="router.push('/manage/accountMe')" />
           <PButton label="儲存修改" severity="primary" icon="pi pi-save" :loading="isSaving" @click="handleUpdate"
             class="px-4 shadow-2" />
         </div>
@@ -167,5 +183,3 @@ onMounted(initData);
     </Card>
   </div>
 </template>
-
-<style scoped></style>

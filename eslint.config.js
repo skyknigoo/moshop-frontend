@@ -1,32 +1,21 @@
-import { defineConfig, globalIgnores } from 'eslint/config'
-import globals from 'globals'
 import js from '@eslint/js'
 import pluginVue from 'eslint-plugin-vue'
-import skipFormatting from 'eslint-config-prettier/flat'
+import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
+import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
 
-export default defineConfig([
+export default defineConfigWithVueTs(
   {
     name: 'app/files-to-lint',
-    files: ['**/*.{vue,js,mjs,jsx}'],
+    files: ['**/*.{ts,mts,tsx,vue}'],
   },
 
-  globalIgnores(['**/dist/**', '**/dist-ssr/**', '**/coverage/**']),
-
   {
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-      },
-    },
+    name: 'app/files-to-ignore',
+    ignores: ['**/dist/**', '**/dist-ssr/**', '**/coverage/**'],
   },
 
   js.configs.recommended,
   ...pluginVue.configs['flat/essential'],
-{
-    // --- 關鍵新增：在專案中關閉單一單字組件名稱限制 ---
-    rules: {
-      'vue/multi-word-component-names': 'off',
-    },
-  },
+  ...vueTsConfigs.recommended, // 核心：加入 TypeScript 推薦配置
   skipFormatting,
-])
+)

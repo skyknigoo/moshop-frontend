@@ -1,4 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  type RouteRecordRaw,
+  type NavigationGuardNext,
+  type RouteLocationNormalized
+} from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 // 匯入組件 ... (維持原樣)

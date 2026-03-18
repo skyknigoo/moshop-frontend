@@ -6,7 +6,7 @@ import { ref, computed } from 'vue';
 interface User {
   id: number;
   name: string;
-  role: 'Guest' | 'Normal' | 'Store' | 'Admin' | 'Sysytem'
+  role: 'Guest' | 'Normal' | 'Store' | 'Admin' | 'System'
 }
 
 export const useAuthStore = defineStore('auth', () => {

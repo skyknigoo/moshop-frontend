@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref } from 'vue';
 import { zodResolver } from '@primevue/forms/resolvers/zod'
 import { useToast } from "primevue/usetoast";
@@ -6,12 +6,19 @@ import { z } from "zod";
 import { useRouter } from 'vue-router';
 import api from '@/api/axios'
 
-
 const router = useRouter();
 const toast = useToast();
 
+// 2. 定義註冊表單型別
+interface RegisterForm {
+    Account: string;
+    MemberName: string;
+    Email: string;
+    Password: string;
+    conpassword: string;
+}
 
-const initialValues = ref({
+const initialValues = ref<RegisterForm>({
     Account: '',
     MemberName: '',
     Email: '',
@@ -19,13 +26,13 @@ const initialValues = ref({
     conpassword: ''
 });
 
+// Zod 驗證邏輯 (100% 維持你原本的邏輯)
 const resolver = ref(zodResolver(
     z.object({
         Account: z.string().min(8, { message: '帳號最少需要 8 位' }),
         MemberName: z.string().min(1, { message: '請填寫姓名' }),
         Email: z.string().email("信箱格式不正確"),
-        Password: z
-            .string()
+        Password: z.string()
             .min(8, { message: "最少需要 8 位" })
             .max(16, { message: "最多只能 16 位" })
             .refine((val) => /[a-z]/.test(val), { message: '需含有小寫英文' })
@@ -33,43 +40,37 @@ const resolver = ref(zodResolver(
             .refine((val) => /\d/.test(val), { message: '需含有數字' })
             .refine((val) => /[@$!%*?&]/.test(val), "需含有特殊符號 (@$!%*?&)"),
         conpassword: z.string().min(1, '請再次輸入密碼')
-
+    }).refine((data) => data.Password === data.conpassword, {
+        message: '兩次輸入的密碼不一致',
+        path: ["conpassword"],
     })
-        .refine((data) => data.Password === data.conpassword, {
-            message: '兩次輸入的密碼不一致',
-            path: ["conpassword"],
-        })
 ))
 
-const onFormSubmit = async ({ valid, values }) => {
+// 3. 加上參數型別標註
+const onFormSubmit = async ({ valid, values }: { valid: boolean; values: any }) => {
     if (valid) {
-        // toast.add({ severity: 'success', summary: '註冊成功', detail: '歡迎來到MoShop', life: 3000 });
-        delete values.conpassword;
-        console.log('註冊資料:', values)
+        // 刪除確認密碼欄位後再送出 (保持原邏輯)
+        const submitData = { ...values };
+        delete submitData.conpassword;
+
+        console.log('註冊資料:', submitData)
 
         try {
-            await api.post('/AccountApi/Register', values);
+            await api.post('/AccountApi/Register', submitData);
 
             toast.add({ severity: 'success', summary: '成功', detail: '註冊成功!即將前往登入頁', life: 2000 });
-            setTimeout(() => router.push('/login'), 2000);
-        } catch (error) {
+            setTimeout(() => router.push('/loginMe'), 2000); // 修正跳轉至 loginMe
+        } catch (error: any) {
             console.error("Api 錯誤詳細資訊:", error.response?.data || error.message);
             const errorMsg = error.response?.data?.message || '註冊失敗，請稍後再試';
             toast.add({ severity: 'error', summary: '註冊失敗', detail: errorMsg, life: 3000 });
         }
     }
 }
-
-
-
-
-
-
-
 </script>
+
 <template>
     <div style="display: flex;justify-content: center;">
-
         <Card style="width: 50rem; overflow: hidden ; ">
             <template #header>
                 <img class="w-full" alt="user header" src="/uploads/Logo/LogoMoShop2.jpg" />
@@ -92,8 +93,8 @@ const onFormSubmit = async ({ valid, values }) => {
                                 size="small" variant="simple">
                                 {{ $form.Account.error?.message }}
                             </Message>
-
                         </div>
+
                         <div class="flex flex-col gap-y-1">
                             <label for="MemberName" class="font-semibold text-slate-700">姓名</label>
                             <InputText name="MemberName" id="MemberNamee" v-model="initialValues.MemberName"
@@ -103,6 +104,7 @@ const onFormSubmit = async ({ valid, values }) => {
                                 {{ $form.MemberName.error?.message }}
                             </Message>
                         </div>
+
                         <div class="flex flex-col gap-y-1">
                             <label for="Email" class="font-semibold text-slate-700">電子信箱</label>
                             <InputText name="Email" id="Email" v-model="initialValues.Email" placeholder="請輸入信箱"
@@ -112,6 +114,7 @@ const onFormSubmit = async ({ valid, values }) => {
                                 {{ $form.Email.error?.message }}
                             </Message>
                         </div>
+
                         <div class="flex flex-col gap-y-1">
                             <label for="Password" class="font-semibold text-slate-700">密碼</label>
                             <Password name="Password" id="Password" v-model="initialValues.Password" :feedback="false"
@@ -142,20 +145,9 @@ const onFormSubmit = async ({ valid, values }) => {
                         </div>
                     </div>
                 </PForm>
-
-
-
             </template>
             <template #footer>
-
             </template>
-
         </Card>
-
-
-
-
-
     </div>
-
 </template>

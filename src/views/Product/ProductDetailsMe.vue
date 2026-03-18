@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import api from '@/api/axios';
 import { zodResolver } from '@primevue/forms/resolvers/zod'
@@ -6,101 +6,129 @@ import { z } from "zod";
 import { useToast } from "primevue/usetoast";
 import { useRouter } from 'vue-router';
 
+// --- 1. 定義型別介面 (對應後端 PascalCase) ---
+interface ProductGroup {
+    groupName: string;
+}
+
+interface Product {
+    productID: number;
+    productName: string;
+    productPrice: number;
+    productDescription: string | null;
+    imagePath: string | null;
+    stockQty: number;
+    group: ProductGroup;
+}
+
+interface OrderForm {
+    receiverName: string;
+    receiverPhone: string;
+    city: string;
+    district: string;
+    detailAddress: string;
+}
+
 const router = useRouter();
 const toast = useToast();
 
-const props = defineProps(['id']);
-const product = ref(null);
+// 2. Props 型別標註
+const props = defineProps<{
+    id: string | number;
+}>();
+
+const product = ref<Product | null>(null);
 const quantity = ref(1);
 const showModal = ref(false);
 const saveDefault = ref(false);
 const submitting = ref(false);
-const formatPrice = (val) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
 
-const twData = {
-  "台北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
-  "台中市": ["中區", "東區", "南區", "西區", "北區", "北屯區", "西屯區", "南屯區", "太平區", "大里區", "霧峰區", "烏日區"],
-  "高雄市": ["新興區", "前金區", "苓雅區", "鹽埕區", "鼓山區", "旗津區", "前鎮區", "三民區", "楠梓區", "小港區", "左營區"]
+// 格式化價格
+const formatPrice = (val: number | null | undefined) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
+
+const twData: Record<string, string[]> = {
+    "台北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
+    "台中市": ["中區", "東區", "南區", "西區", "北區", "北屯區", "西屯區", "南屯區", "太平區", "大里區", "霧峰區", "烏日區"],
+    "高雄市": ["新興區", "前金區", "苓雅區", "鹽埕區", "鼓山區", "旗津區", "前鎮區", "三民區", "楠梓區", "小港區", "左營區"]
 };
+
 const currentDistricts = computed(() => twData[orderForm.value.city] || []);
 const fullAddress = computed(() => `${orderForm.value.city}${orderForm.value.district}${orderForm.value.detailAddress}`);
 
-const orderForm = ref({
-  receiverName: '',
-  receiverPhone: '',
-  city: '',
-  district: '',
-  detailAddress: ''
+const orderForm = ref<OrderForm>({
+    receiverName: '',
+    receiverPhone: '',
+    city: '',
+    district: '',
+    detailAddress: ''
 })
 
-// 讀取商品資料
+// 3. 讀取商品資料 (維持你原本的 fetcData 命名)
 const fetcData = async () => {
-  try {
-    const res = await api.get(`/ProductAPi/${props.id}`);
-    product.value = res;
-    // 讀取儲存在本地的收件資訊
+    try {
+        const res: any = await api.get(`/ProductAPi/${props.id}`);
+        product.value = res;
 
-    const saved = JSON.parse(localStorage.getItem("moshop_default_info"));
-    if (saved) { orderForm.value = { ...saved }; saveDefault.value = true; }
-  } catch (e) { console.error(e); }
+        const savedStr = localStorage.getItem("moshop_default_info");
+        if (savedStr) {
+            const saved = JSON.parse(savedStr);
+            orderForm.value = { ...saved };
+            saveDefault.value = true;
+        }
+    } catch (e) {
+        console.error(e);
+    }
 }
 
-// 儲存預設收件資訊
-const onFormSubmit = async ({ valid }) => {
-  if (valid) {
-    // 驗證通過，執行儲存預設資訊的邏輯
-    if (saveDefault.value) {
-      localStorage.setItem("moshop_default_info", JSON.stringify(orderForm.value));
-    } else {
-      localStorage.removeItem("moshop_default_info");
+const onFormSubmit = async ({ valid }: { valid: boolean }) => {
+    if (valid) {
+        if (saveDefault.value) {
+            localStorage.setItem("moshop_default_info", JSON.stringify(orderForm.value));
+        } else {
+            localStorage.removeItem("moshop_default_info");
+        }
+        showModal.value = true;
     }
-
-    // 開啟確認視窗
-    showModal.value = true;
-  }
 };
 
-// 前端阻擋
 const resolver = ref(zodResolver(
-  z.object({
-    receiverName: z.string().min(1, { message: '請填寫姓名' }),
-    receiverPhone: z.string()
-      .min(10, { message: '電話至少需 10 碼' })
-      .regex(/^09\d{8}$/, { message: '手機格式不正確 (例如: 0912345678)' }),
-    // 下拉選單驗證
-    city: z.string().min(1, { message: '請選擇縣市' }),
-    district: z.string().min(1, { message: '請選擇區域' }),
-    detailAddress: z.string().min(1, { message: '請輸入詳細地址' })
-
-  })
+    z.object({
+        receiverName: z.string().min(1, { message: '請填寫姓名' }),
+        receiverPhone: z.string()
+            .min(10, { message: '電話至少需 10 碼' })
+            .regex(/^09\d{8}$/, { message: '手機格式不正確 (例如: 0912345678)' }),
+        city: z.string().min(1, { message: '請選擇縣市' }),
+        district: z.string().min(1, { message: '請選擇區域' }),
+        detailAddress: z.string().min(1, { message: '請輸入詳細地址' })
+    })
 ))
 
-// 確認訂單
 const submitOrder = async () => {
-  submitting.value = true;
-  console.log('傳遞資料:', orderForm.value)
-  const orderData = {
-    ProductId: product.value.productID,
-    OrderQty: quantity.value,
-    ReceiverName: orderForm.value.receiverName,
-    ReceiverPhone: orderForm.value.receiverPhone,
-    ReceiverAddress: fullAddress.value
-  };
-  try {
+    if (!product.value) return;
+    submitting.value = true;
 
-    const res = await api.post('/OrderApi/SubmitOrder', orderData);
-    if (res.success) {
+    const orderData = {
+        ProductId: product.value.productID,
+        OrderQty: quantity.value,
+        ReceiverName: orderForm.value.receiverName,
+        ReceiverPhone: orderForm.value.receiverPhone,
+        ReceiverAddress: fullAddress.value
+    };
 
-      toast.add({ severity: 'success', summary: '下單成功', detail: '感謝您的購買！即將前往訂單列表...', life: 2000 });
-      setTimeout(() => {
-        router.push('/order'); // 假設你的訂單列表路由路徑是 /order
-      }, 1500);
+    try {
+        const res: any = await api.post('/OrderApi/SubmitOrder', orderData);
+        if (res.success) {
+            toast.add({ severity: 'success', summary: '下單成功', detail: '感謝您的購買！即將前往訂單列表...', life: 2000 });
+            setTimeout(() => {
+                router.push('/orderMe');
+            }, 1500);
+        }
+    } catch (error: any) {
+        console.error("Api 錯誤詳細資訊:", error.response?.data || error.message);
+        toast.add({ severity: 'error', summary: '失敗', detail: error.response?.data?.message || '系統錯誤', life: 3000 });
+    } finally {
+        submitting.value = false;
     }
-  } catch (error) {
-    console.error("Api 錯誤詳細資訊:", error.response?.data || error.message);
-    toast.add({ severity: 'error', summary: '失敗', detail: error.response?.data?.message || '系統錯誤', life: 3000 });
-
-  }
 }
 
 onMounted(fetcData);
@@ -110,7 +138,7 @@ onMounted(fetcData);
   <nav class="flex align-items-center gap-2 mb-4 text-sm">
     <router-link to="/" class="text-primary no-underline hover:underline">商品首頁</router-link>
     <i class="pi pi-chevron-right text-xs text-400"></i>
-    <span class="text-600" v-if="product">{{ product.group.groupName }}</span>
+    <span class="text-600" v-if="product">{{ product.group?.groupName }}</span>
   </nav>
 
   <div v-if="product" class="flex">
@@ -126,7 +154,7 @@ onMounted(fetcData);
     </div>
     <div class="col-12 md:col-6 pl-md-4">
       <div>
-        <h6 class="text-primary font-bold uppercase mb-1">{{ product.group.groupName }}</h6>
+        <h6 class="text-primary font-bold uppercase mb-1">{{ product.group?.groupName }}</h6>
         <h1 class="text-4xl font-bold mb-3 text-900">{{ product.productName }}</h1>
         <div class="mb-4">
           <span class="text-3xl text-danger font-bold">{{ formatPrice(product.productPrice) }}</span>
@@ -255,14 +283,5 @@ onMounted(fetcData);
         <PButton label="確定下單" icon="pi pi-check" severity="primary" @click="submitOrder" :loading="submitting" />
       </template>
     </PDialog>
-
-
   </div>
-
-
-
-
-
 </template>
-
-<style scoped></style>

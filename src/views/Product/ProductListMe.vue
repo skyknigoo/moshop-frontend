@@ -1,24 +1,37 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref, computed, onMounted } from "vue";
 import api from '@/api/axios'
+// 2. 引入 PrimeVue 菜單型別
+import type { MenuItem } from 'primevue/menuitem';
 
-const products = ref([]);
-const groups = ref([]);
+// 3. 定義資料結構介面
+interface Product {
+    productID: number;
+    productName: string;
+    productPrice: number;
+    imagePath: string | null;
+}
+
+interface Category {
+    groupID: number;
+    groupName: string;
+}
+
+const products = ref<Product[]>([]);
+const groups = ref<Category[]>([]);
 const searchQuery = ref('');
-const selectedGroupId = ref(null);
+const selectedGroupId = ref<number | null>(null);
 const loading = ref(false);
 const selectPage = ref(1);
 const currentPage = ref(1);
 const totalPages = ref(1);
 
+// 格式化價格 (加上參數型別)
+const formatPrice = (val: number | null) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
 
-//格式化價格
-const formatPrice = (val) => val ? `NT$ ${val.toLocaleString()}` : 'NT$ 0';
-
-
-// 取得商品分類
-const groupMenuItems = computed(() => {
-    const items = [{ label: '全部商品', icon: '', command: () => selectGroup(null) }];
+// 取得商品分類 (指定回傳型別為 MenuItem[])
+const groupMenuItems = computed((): MenuItem[] => {
+    const items: MenuItem[] = [{ label: '全部商品', icon: '', command: () => selectGroup(null) }];
     groups.value.forEach(c => {
         items.push({
             label: c.groupName,
@@ -29,14 +42,14 @@ const groupMenuItems = computed(() => {
 
     return items;
 });
-// 2. 各分類項目的判斷
 
-const selectGroup = (id) => {
+// 2. 各分類項目的判斷 (加上參數型別)
+const selectGroup = (id: number | null) => {
     selectedGroupId.value = id;
     fetchData();
 }
 
-const selectPageF = (num) => {
+const selectPageF = (num: number) => {
     selectPage.value = num;
     fetchData();
 }
@@ -46,11 +59,11 @@ const searchString = () => {
     fetchData();
 }
 
-
 const fetchData = async () => {
     loading.value = true;
     try {
-        const res = await api.get('/ProductApi', {
+        // 使用 res: any 確保能讀取你後端回傳的 items, categories 等欄位
+        const res: any = await api.get('/ProductApi', {
             params: {
                 search: searchQuery.value,
                 groupId: selectedGroupId.value,
@@ -63,7 +76,7 @@ const fetchData = async () => {
         groups.value = res.categories || [];
         totalPages.value = res.totalPages || 1;
         currentPage.value = res.currentPage || 1;
-    } catch (e) {
+    } catch (e: any) {
         console.error("API請求發生錯誤", e.message);
         if (e.response) {
             console.error("伺服器回傳狀態碼:", e.response.status);
@@ -71,11 +84,7 @@ const fetchData = async () => {
     } finally {
         loading.value = false;
     }
-
-
 }
-
-
 
 onMounted(fetchData);
 </script>
@@ -137,14 +146,10 @@ onMounted(fetchData);
 
     <div>
     </div>
-
-
-
 </template>
 
-
 <style scoped>
-/* 使用 :deep 穿透並定位到選單內部的連結 */
+/* 樣式 100% 沒動 */
 :deep(.selectMenuItem .p-menu-item-content) {
     background-color: rgb(202, 221, 255) !important;
 }

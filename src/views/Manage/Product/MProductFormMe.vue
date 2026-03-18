@@ -1,10 +1,30 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '@/api/axios';
 import { useToast } from 'primevue/usetoast';
 import { zodResolver } from '@primevue/forms/resolvers/zod'
 import { z } from "zod";
+
+// --- 2. 定義型別介面 (對應後端 PascalCase 欄位) ---
+interface Category {
+  groupID: number;
+  groupName: string;
+}
+
+interface Product {
+  productID: number;
+  productName: string;
+  productDescription: string;
+  productGroup: number;
+  productPrice: number;
+  stockQty: number;
+  status: number;
+  imagePath: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  updatedBy: string;
+}
 
 // --- 路由與狀態 ---
 const route = useRoute();
@@ -13,32 +33,35 @@ const toast = useToast();
 
 const isEdit = computed(() => !!route.params.id);
 const isSaving = ref(false);
-const categories = ref([]);
-const imagePreview = ref(null);
-const selectedFile = ref(null);
+const categories = ref<Category[]>([]); // 3. 標註型別
+const imagePreview = ref<string | null>(null);
+const selectedFile = ref<File | null>(null);
 
-// 依照 MSProduct 模型初始化
-const product = ref({
+// 依照 MSProduct 模型初始化 (標註為 Product 型別)
+const product = ref<Product>({
   productID: 0,
   productName: '',
   productDescription: '',
   productGroup: 0,
   productPrice: 0,
   stockQty: 0,
-  status: 1, // 預設 Available (1)
+  status: 1,
   imagePath: '',
   createdAt: null,
   updatedAt: null,
   updatedBy: ''
 });
 
+// 為了操作隱藏的 file input 定義 ref
+const fileInput = ref<HTMLInputElement | null>(null);
+
 // 讀取資料
 const initData = async () => {
   try {
-    const catRes = await api.get('/manage/MProductApi/Categories')
+    const catRes: any = await api.get('/manage/MProductApi/Categories')
     categories.value = catRes;
     if (isEdit.value) {
-      const res = await api.get(`/manage/MProductApi/${route.params.id}`);
+      const res: any = await api.get(`/manage/MProductApi/${route.params.id}`);
       product.value = res.product;
     }
   } catch (e) {
@@ -47,16 +70,17 @@ const initData = async () => {
   }
 }
 
-// --- 圖片處理 ---
-const onFileSelect = (event) => {
-  const file = event.target.files[0];
+// --- 圖片處理 (標註事件型別) ---
+const onFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
   if (file) {
     selectedFile.value = file;
     imagePreview.value = URL.createObjectURL(file);
   }
 }
 
-// 表單驗證
+// 表單驗證邏輯維持原樣
 const resolver = ref(zodResolver(
   z.object({
     productName: z.string().min(1, '請填寫商品名稱'),
@@ -65,29 +89,35 @@ const resolver = ref(zodResolver(
     productPrice: z.number().min(1, '請填寫價錢'),
     stockQty: z.number().min(1, '請填寫商品數量'),
   })
-
 ))
 
-
-const onFormSubmit = async ({ valid, values }) => {
+// 表單提交 (處理 FormData 轉換)
+const onFormSubmit = async ({ valid, values }: { valid: boolean; values: any }) => {
   if (valid) {
     console.log("傳遞的資料=>", values)
     isSaving.value = true;
     const formData = new FormData();
+
+    // 將表單值填入 FormData
     Object.keys(values).forEach(key => {
       formData.append(key, values[key]);
     });
-    // 處理時間與路徑 (編輯模式重要)
-    if (isEdit.value) { formData.append('ProductID', product.value.productID); }
+
+    // 處理編輯模式下的必要欄位
+    if (isEdit.value) {
+        formData.append('ProductID', product.value.productID.toString());
+    }
     if (product.value.imagePath) formData.append('ImagePath', product.value.imagePath);
     if (product.value.createdAt) formData.append('CreatedAt', product.value.createdAt);
 
-    // 夾帶實體檔案(圖片)
-    if (selectedFile.value) { formData.append('ImageFile', selectedFile.value); }
+    // 夾帶實體檔案
+    if (selectedFile.value) {
+        formData.append('ImageFile', selectedFile.value);
+    }
 
     try {
       const actionUrl = isEdit.value ? 'Edit' : 'Create';
-      const res = await api.post(`/manage/MProductApi/${actionUrl}`, formData, {
+      const res: any = await api.post(`/manage/MProductApi/${actionUrl}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -95,8 +125,8 @@ const onFormSubmit = async ({ valid, values }) => {
         toast.add({ severity: 'success', summary: '儲存成功', detail: res.message, life: 2000 });
         setTimeout(() => router.push('/manage/productMe'), 1200);
       }
-    } catch (err) {
-      const errorMsg = err.response?.message || '儲存過程中發生錯誤';
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || '儲存過程中發生錯誤';
       toast.add({ severity: 'error', summary: '儲存失敗', detail: errorMsg, life: 3000 });
     } finally {
       isSaving.value = false;
@@ -104,11 +134,9 @@ const onFormSubmit = async ({ valid, values }) => {
   }
 }
 
-
-const formatDate = (date) => date ? new Date(date).toLocaleString() : '無資料';
+const formatDate = (date: string | null | undefined) => date ? new Date(date).toLocaleString() : '無資料';
 
 onMounted(initData);
-
 </script>
 
 <template>
@@ -129,6 +157,7 @@ onMounted(initData);
       <PButton label="返回列表" icon="pi pi-arrow-left" severity="secondary" outlined
         @click="router.push('/manage/productMe')" />
     </div>
+
     <div v-if="!isEdit || (isEdit && product.productID !== 0)">
       <PForm v-slot="$form" :resolver="resolver" :initialValues="product" @submit="onFormSubmit"
         class="flex flex-col gap-4 w-full ">
@@ -143,7 +172,7 @@ onMounted(initData);
                     <InputText name="productName" id="name" v-model="product.productName" maxlength="60"
                       placeholder="例如：高效能攀岩粉袋" />
                     <small class="text-500">剩餘字數：{{ 60 - (product.productName?.length || 0) }}</small>
-                    <Message class="text-red-400  -m-1" v-if="$form?.productName?.invalid" severity="error" size="small"
+                    <Message class="text-red-400 -m-1" v-if="$form?.productName?.invalid" severity="error" size="small"
                       variant="simple">
                       {{ $form.productName.error?.message }}
                     </Message>
@@ -153,7 +182,7 @@ onMounted(initData);
                     <label for="desc" class="font-bold text-700">* 商品詳細描述</label>
                     <PTextarea name="productDescription" id="desc" v-model="product.productDescription" rows="10"
                       placeholder="請輸入商品規格、材質與使用說明..." />
-                    <Message class="text-red-400  -m-1" v-if="$form?.productDescription?.invalid" severity="error"
+                    <Message class="text-red-400 -m-1" v-if="$form?.productDescription?.invalid" severity="error"
                       size="small" variant="simple">
                       {{ $form.productDescription.error?.message }}
                     </Message>
@@ -172,7 +201,7 @@ onMounted(initData);
                 <div class="flex flex-column gap-2">
                   <input type="file" ref="fileInput" class="hidden" accept="image/*" @change="onFileSelect" />
                   <PButton label="更換商品圖片" icon="pi pi-upload" severity="info" class="w-full"
-                    @click="$refs.fileInput.click()" />
+                    @click="fileInput?.click()" />
                   <p class="text-center text-500 text-xs mt-2">支援 JPG, PNG 格式，建議正方形比例以獲得最佳顯示效果</p>
                 </div>
               </template>
@@ -188,7 +217,7 @@ onMounted(initData);
                     <label class="font-bold text-700">* 商品類別</label>
                     <PSelect name="productGroup" v-model="product.productGroup" :options="categories"
                       optionLabel="groupName" optionValue="groupID" placeholder="請選擇分類" />
-                    <Message class="text-red-400  -m-1" v-if="$form?.productGroup?.invalid" severity="error"
+                    <Message class="text-red-400 -m-1" v-if="$form?.productGroup?.invalid" severity="error"
                       size="small" variant="simple">
                       {{ $form.productGroup.error?.message }}
                     </Message>
@@ -198,7 +227,7 @@ onMounted(initData);
                     <label class="font-bold text-700">* 銷售價格 (TWD)</label>
                     <InputNumber name="productPrice" v-model="product.productPrice" currency="TWD" locale="zh-TW"
                       :min="0" placeholder="0" />
-                    <Message class="text-red-400  -m-1" v-if="$form?.productPrice?.invalid" severity="error"
+                    <Message class="text-red-400 -m-1" v-if="$form?.productPrice?.invalid" severity="error"
                       size="small" variant="simple">
                       {{ $form.productPrice.error?.message }}
                     </Message>
@@ -207,7 +236,7 @@ onMounted(initData);
                   <div class="flex flex-column gap-2">
                     <label class="font-bold text-700">* 現有庫存</label>
                     <InputNumber name="stockQty" id="stockQty" v-model="product.stockQty" showButtons :min="0" />
-                    <Message class="text-red-400  -m-1" v-if="$form?.stockQty?.invalid" severity="error" size="small"
+                    <Message class="text-red-400 -m-1" v-if="$form?.stockQty?.invalid" severity="error" size="small"
                       variant="simple">
                       {{ $form.stockQty.error?.message }}
                     </Message>

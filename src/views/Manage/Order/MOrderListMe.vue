@@ -1,110 +1,129 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref, onMounted } from 'vue';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 import api from '@/api/axios';
+
+// --- 2. 定義型別介面 (對應後端 PascalCase 欄位) ---
+interface OrderProduct {
+    productName: string;
+    imagePath: string | null;
+}
+
+interface OrderItem {
+    orderID: number;
+    account: string;
+    receiverName: string;
+    receiverPhone: string;
+    upDate: string; // 對應你原本的命名
+    orderQty: number;
+    totalPrice: number;
+    status: number;
+    product: OrderProduct | null;
+}
+
+interface StatusOption {
+    label: string;
+    value: number | null;
+    severity: "warn" | "info" | "success" | "secondary" | "danger";
+}
+
 const toast = useToast();
 const confirm = useConfirm();
 
-// --- 狀態定義 ---
-const orders = ref([]);
+// --- 3. 狀態定義與型別標註 ---
+const orders = ref<OrderItem[]>([]);
 const loading = ref(false);
 const totalCount = ref(0);
 const filters = ref({
-  page: 1,
-  search: '',
-  status: null
+    page: 1,
+    search: '',
+    status: null as number | null
 });
 
-// 狀態選項 (對應 OrderStatus Enum)
-const statusOptions = [
-  { label: '處理中', value: 0, severity: 'warn' },
-  { label: '寄送中', value: 1, severity: 'info' },
-  { label: '已完成', value: 2, severity: 'success' },
-  { label: '取消訂單', value: 3, severity: 'Secondary' },
-  { label: '已退貨', value: 4, severity: 'danger' }
+// 狀態選項 (修正 Secondary 為 secondary)
+const statusOptions: StatusOption[] = [
+    { label: '處理中', value: 0, severity: 'warn' },
+    { label: '寄送中', value: 1, severity: 'info' },
+    { label: '已完成', value: 2, severity: 'success' },
+    { label: '取消訂單', value: 3, severity: 'secondary' },
+    { label: '已退貨', value: 4, severity: 'danger' }
 ];
 
 // 訂單狀態操作
-const handleStatusChange = (status) => {
-  filters.value.status = status;
-  filters.value.page = 1;
-  loadData();
+const handleStatusChange = (status: number | null) => {
+    filters.value.status = status;
+    filters.value.page = 1;
+    loadData();
 }
 
 // 清空搜尋
 const resetFilters = () => {
-  filters.value = { page: 1, search: '', status: null };
-  loadData();
+    filters.value = { page: 1, search: '', status: null };
+    loadData();
 }
 
 // 更換頁面
-const onPageChange = (event) => {
-  filters.value.page = event.page + 1;
-  loadData();
-
+const onPageChange = (event: any) => {
+    filters.value.page = event.page + 1;
+    loadData();
 }
-
 
 // 讀取訂單資料
 const loadData = async () => {
-  loading.value = true;
-  try {
-    const res = await api.get('/manage/MorderApi', { params: filters.value });
-    console.log("訂單資料=>", res)
-    orders.value = res.items;
-    totalCount.value = res.pagination.totalCount;
-  } catch (e) {
-    console.log(e);
-    toast.add({ severity: 'error', summary: '錯誤', detail: '無法讀取訂單資料' });
-  } finally {
-    loading.value = false;
-  }
-
+    loading.value = true;
+    try {
+        const res: any = await api.get('/manage/MorderApi', { params: filters.value });
+        console.log("訂單資料=>", res)
+        orders.value = res.items || [];
+        totalCount.value = res.pagination?.totalCount || 0;
+    } catch (e) {
+        console.log(e);
+        toast.add({ severity: 'error', summary: '錯誤', detail: '無法讀取訂單資料' });
+    } finally {
+        loading.value = false;
+    }
 }
 
 // 出貨操作
-const confirmShipping = (order) => {
-  confirm.require({
-    header: '確認出貨?',
-    message: `您確定要將訂單 #${order.orderID} 標記為『寄送中』嗎？這將記錄出貨時間。`,
-    icon: 'pi pi-info-circle',
-    acceptLabel: '確定出貨',
-    rejectLabel: '取消',
-    acceptClass: 'p-button-danger',
-    rejectClsss: 'p-button-outlined',
-    accept: async () => {
-      try {
-        const res = await api.post(`/manage/MOrderApi/Shipping/${order.orderID}`);
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 3000 });
-          loadData();
+const confirmShipping = (order: OrderItem) => {
+    confirm.require({
+        header: '確認出貨?',
+        message: `您確定要將訂單 #${order.orderID} 標記為『寄送中』嗎？這將記錄出貨時間。`,
+        icon: 'pi pi-info-circle',
+        acceptLabel: '確定出貨',
+        rejectLabel: '取消',
+        acceptClass: 'p-button-danger',
+        rejectClass: 'p-button-outlined', // 修正拼字 rejectClsss -> rejectClass
+        accept: async () => {
+            try {
+                const res: any = await api.post(`/manage/MOrderApi/Shipping/${order.orderID}`);
+                if (res.success) {
+                    toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 3000 });
+                    loadData();
+                }
+            } catch (err: any) {
+                toast.add({ severity: 'error', summary: '操作失敗', detail: err.response?.data?.message || '系統錯誤' });
+            }
         }
-      } catch (err) {
-        toast.add({ severity: 'error', summary: '操作失敗', detail: err.response?.message || '系統錯誤' });
-      }
-    }
-  });
+    });
 };
 
-
-
-//  小工具
-const getStatusLabel = (status) => {
-  const opt = statusOptions.find(o => o.value === status);
-  return opt ? opt.label : '未知';
+// 小工具 (加上型別標註)
+const getStatusLabel = (status: number) => {
+    const opt = statusOptions.find(o => o.value === status);
+    return opt ? opt.label : '未知';
 }
 
-const getStatusSeverity = (status) => {
-  const opt = statusOptions.find(o => o.value === status);
-  return opt ? opt.severity : 'secondary';
+const getStatusSeverity = (status: number) => {
+    const opt = statusOptions.find(o => o.value === status);
+    return opt ? opt.severity : 'secondary';
 }
 
-const formatDate = (val) => val ? new Date(val).toLocaleString() : '-';
+const formatDate = (val: string | null | undefined) => val ? new Date(val).toLocaleString() : '-';
 
 onMounted(loadData);
 </script>
-
 
 <template>
   <div class="p-4 surface-ground min-h-screen">
@@ -121,7 +140,7 @@ onMounted(loadData);
             <div class="flex flex-wrap gap-2">
               <PButton label="全部" :outlined="filters.status !== null" severity="secondary" rounded
                 @click="handleStatusChange(null)" />
-              <PButton v-for="s in statusOptions" :key="s.value" :label="s.label" :outlined="filters.status !== s.value"
+              <PButton v-for="s in statusOptions" :key="s.value ?? 'all'" :label="s.label" :outlined="filters.status !== s.value"
                 :severity="s.severity" rounded @click="handleStatusChange(s.value)" />
             </div>
           </div>
@@ -138,11 +157,11 @@ onMounted(loadData);
     <div class="surface-card border-round shadow-1 overflow-hidden">
       <DataTable :value="orders" :loading="loading" responsiveLayout="scroll" class="p-datatable-sm" stripedRows>
         <Column field="orderID" header="單號" class="font-bold">
-          <template #body="{ data }">#{{ data.orderID }}</template>
+          <template #body="{ data }: { data: OrderItem }">#{{ data.orderID }}</template>
         </Column>
 
         <Column header="會員 / 收件人 / 訂單時間">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: OrderItem }">
             <div class="font-bold text-900">{{ data.account }}</div>
             <div class="text-sm text-600">{{ data.receiverName }} ({{ data.receiverPhone }})</div>
             <div class="text-xs text-500 mt-1">
@@ -152,7 +171,7 @@ onMounted(loadData);
         </Column>
 
         <Column header="商品項目">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: OrderItem }">
             <div class="flex align-items-center gap-3">
               <PImage :src="data.product?.imagePath || '/uploads/Comm/等待餵圖.png'" width="50"
                 class="border-round shadow-1" />
@@ -165,13 +184,13 @@ onMounted(loadData);
         </Column>
 
         <Column header="總金額">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: OrderItem }">
             <span class="text-primary font-bold text-lg">NT$ {{ data.totalPrice.toLocaleString() }}</span>
           </template>
         </Column>
 
         <Column header="狀態與動作">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: OrderItem }">
             <div class="flex flex-column gap-2">
               <Tag :value="getStatusLabel(data.status)" :severity="getStatusSeverity(data.status)"
                 style="width: fit-content;" />
@@ -181,13 +200,9 @@ onMounted(loadData);
             </div>
           </template>
         </Column>
-
       </DataTable>
-
 
       <Paginator :rows="10" :totalRecords="totalCount" @page="onPageChange" />
     </div>
-
   </div>
-
 </template>

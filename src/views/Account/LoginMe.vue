@@ -1,20 +1,24 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref } from 'vue';
 import { zodResolver } from '@primevue/forms/resolvers/zod'
 import { useToast } from "primevue/usetoast";
 import { z } from "zod";
-import { useRoute } from 'vue-router'; // 1. 匯入 useRoute
-import { useRouter } from 'vue-router'; // 1. 匯入 useRoute
+import { useRoute, useRouter } from 'vue-router';
 import api from '@/api/axios'
 import { useAuthStore } from '@/stores/auth';
 
-const router = useRouter(); // 動作派
-const route = useRoute();   // 資訊派
+// 2. 定義表單資料型別
+interface LoginValues {
+    account?: string;
+    password?: string;
+}
+
+const router = useRouter();
+const route = useRoute();
 const toast = useToast();
 const auth = useAuthStore();
 
-
-const initialValues = ref({
+const initialValues = ref<LoginValues>({
     account: '',
     password: '',
 });
@@ -26,37 +30,19 @@ const resolver = ref(zodResolver(
     })
 ))
 
+// 3. 加上參數型別標註
+const onFormSubmit = async ({ valid }: { valid: boolean }) => {
+    if (!valid) return;
 
-// Cookie方法
-// const onFormSubmit = async () => {
-//     try {
-//         const res = await axios.post('http://localhost:5158/api/AccountApi/Login', initialValues.value)
-//         console.log("🚀 ~ onFormSubmit ~ res=>", res)
-//         auth.login(res.data.user);
-
-//         toast.add({ severity: 'success', summary: '登入成功', detail: `歡迎回來，${res.data.user.name}！`, life: 2000 })
-
-//         setTimeout(() => router.push('/', 1000));
-
-//     } catch (error) {
-//         console.log("登入失敗:", error);
-//         const errorMsg = error.response?.daat?.message || '帳號或密碼錯誤';
-//         toast.add({ severity: 'error', summary: '登入失敗', detail: errorMsg, life: 3000 });
-//     }
-
-// }
-
-const onFormSubmit = async () => {
     try {
-        // 1. 發送請求
-        const res = await api.post('/AccountApi/Login', initialValues.value)
+        // 1. 發送請求 (維持原本 API 路徑)
+        const res: any = await api.post('/AccountApi/Login', initialValues.value)
         console.log("🚀 ~ onFormSubmit ~ res=>", res)
 
-        // 2. 解構出 token 和 user (這是後端回傳的新結構)
+        // 2. 解構出 token 和 user (TS 現在知道 res 是 any 所以不會報錯)
         const { token, user } = res;
 
         // 3. 將資料存入 Auth Store
-        // 記得修改你的 authStore.login，讓它能同時接收 user 和 token
         auth.login(user, token);
 
         toast.add({
@@ -66,26 +52,21 @@ const onFormSubmit = async () => {
             life: 2000
         });
 
-        const redirectPath = route.query.redirect || '/';
+        // 4. 處理跳轉路徑 (加上字串轉型以符合 TS 要求)
+        const redirectPath = (route.query.redirect as string) || '/';
         setTimeout(() => router.push(redirectPath), 1);
-    } catch (error) {
+
+    } catch (error: any) {
         console.log("登入失敗:", error);
-        // 修正：將 .daat 改回 .data
+        // 修正後的錯誤訊息讀取
         const errorMsg = error.response?.data?.message || '帳號或密碼錯誤';
         toast.add({ severity: 'error', summary: '登入失敗', detail: errorMsg, life: 3000 });
     }
 }
-
-
-
-
 </script>
-
-
 
 <template>
     <div style="display: flex;justify-content: center;">
-
         <Card style="width: 30rem; overflow: hidden ; ">
             <template #header>
                 <img class="w-full" alt="user header" src="/uploads/Logo/LogoMoShop2.jpg" />
@@ -107,9 +88,7 @@ const onFormSubmit = async () => {
                                 size="small" variant="simple">
                                 {{ $form.account.error?.message }}
                             </Message>
-
                         </div>
-
 
                         <div class="flex flex-col gap-y-1">
                             <label for="password" class="font-semibold text-slate-700">密碼</label>
@@ -118,11 +97,10 @@ const onFormSubmit = async () => {
                             <template v-if="$form?.password?.invalid">
                                 <Message v-for="(error, index) of $form.password.errors" :key="index" severity="error"
                                     size="small" variant="simple" class="text-red-400  -m-1">
-                                    {{ $form.password.error?.message }}
+                                    {{ error.message }}
                                 </Message>
                             </template>
                         </div>
-
 
                         <div class="flex flex-col gap-y-2 mt-4">
                             <PButton label="立即登入" class="w-full" type="submit" />
@@ -131,18 +109,9 @@ const onFormSubmit = async () => {
                         </div>
                     </div>
                 </PForm>
-
             </template>
             <template #footer>
-
             </template>
-
         </Card>
-
-
-
-
-
     </div>
-
 </template>

@@ -1,86 +1,98 @@
-<script setup>
+<script setup lang="ts"> // 1. 加上 lang="ts"
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { useConfirm } from 'primevue/useconfirm';
 import api from '@/api/axios';
 
+// --- 2. 定義型別介面 (對應你的後端欄位) ---
+interface MemberItem {
+    account: string;
+    memberName: string;
+    updatedAt: string | null;
+    updatedBy: string | null;
+}
+
+interface AccountFilters {
+    account: string;
+    email: string;
+    page: number;
+}
+
 const router = useRouter();
 const toast = useToast();
 const confirm = useConfirm();
 
-const formatDate = (date) => date ? new Date(date).toLocaleString() : '-';
+const formatDate = (date: string | null | undefined) => date ? new Date(date).toLocaleString() : '-';
 
-
-// --- 響應式狀態 ---
-const members = ref([]);
+// --- 3. 響應式狀態型別標註 ---
+const members = ref<MemberItem[]>([]);
 const loading = ref(false);
 const totalRecords = ref(0);
-const filters = ref({
-  account: '',
-  email: '',
-  page: 1
+const filters = ref<AccountFilters>({
+    account: '',
+    email: '',
+    page: 1
 });
 
-// 讀取資料
+// 讀取資料 (維持原本 API 邏輯)
 const loadData = async () => {
-  loading.value = true;
-  try {
-    const res = await api.get('/manage/MAccountApi', {
-      params: filters.value,
-      withCredentials: true
-    });
-    console.log("帳號資料=>", res)
-    // API 回傳結構：{ items: [], pagination: { totalCount: X } }
-    members.value = res.items;
-    totalRecords.value = res.pagination.totalCount;
-  } catch (e) {
-    console.error(e);
-    toast.add({ severity: 'error', summaty: '資料讀取資拜', detail: '伺服器連線異常' })
-  } finally {
-    loading.value = false;
-  }
+    loading.value = true;
+    try {
+        const res: any = await api.get('/manage/MAccountApi', {
+            params: filters.value,
+            withCredentials: true
+        });
+        console.log("帳號資料=>", res)
+
+        // API 回傳結構對接
+        members.value = res.items || [];
+        totalRecords.value = res.pagination?.totalCount || 0;
+    } catch (e) {
+        console.error(e);
+        // 修正錯字 summaty -> summary
+        toast.add({ severity: 'error', summary: '資料讀取失敗', detail: '伺服器連線異常' })
+    } finally {
+        loading.value = false;
+    }
 }
 
 // 清除
 const resetFilters = () => {
-  filters.value = { account: '', email: '', page: 1 };
-  loadData();
-}
-// 切頁
-const onPageChange = (event) => {
-  filters.value.page = event.page + 1;
-  loadData();
+    filters.value = { account: '', email: '', page: 1 };
+    loadData();
 }
 
-// 刪除帳號
-const confirmDelete = (user) => {
-  confirm.require({
-    header: '確定要刪除帳號嗎？',
-    message: `帳號「${user.account}」刪除後將無法還原！`,
-    icon: 'pi pi-exclamation-triangle',
-    acceptLabel: '確定刪除',
-    rejectLabel: '取消',
-    acceptClass: 'p-button-danger',
-    accept: async () => {
-      try {
-        // 對接 API: Post Delete
-        const res = await api.post(`/manage/MAccountApi/Delete/${user.account}`);
+// 切頁 (標註事件型別)
+const onPageChange = (event: any) => {
+    filters.value.page = event.page + 1;
+    loadData();
+}
 
-        if (res.success) {
-          toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 3000 });
-          loadData(); // 重新整理表格，不需重新整理網頁
+// 刪除帳號 (標註參數型別)
+const confirmDelete = (user: MemberItem) => {
+    confirm.require({
+        header: '確定要刪除帳號嗎？',
+        message: `帳號「${user.account}」刪除後將無法還原！`,
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: '確定刪除',
+        rejectLabel: '取消',
+        acceptClass: 'p-button-danger',
+        accept: async () => {
+            try {
+                const res: any = await api.post(`/manage/MAccountApi/Delete/${user.account}`);
+                if (res.success) {
+                    toast.add({ severity: 'success', summary: '成功', detail: res.message, life: 3000 });
+                    loadData();
+                }
+            } catch (err: any) {
+                toast.add({ severity: 'error', summary: '刪除失敗', detail: err.response?.data?.message || '刪除失敗' });
+            }
         }
-      } catch (err) {
-        toast.add({ severity: 'error', summary: '刪除失敗', detail: err.response?.message || '刪除失敗' });
-      }
-    }
-  });
+    });
 }
-
 
 onMounted(loadData);
-
 </script>
 
 <template>
@@ -123,7 +135,7 @@ onMounted(loadData);
         <Column field="account" header="帳號" class="font-bold text-900" />
         <Column field="memberName" header="名稱" />
         <Column header="最後修改時間">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MemberItem }">
             <span v-if="data.updatedAt">
               <i class="pi pi-clock text-xs mr-1 text-500"></i>
               {{ formatDate(data.updatedAt) }}
@@ -132,12 +144,12 @@ onMounted(loadData);
           </template>
         </Column>
         <Column header="最後修改人員">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MemberItem }">
             <Tag :value="data.updatedBy || 'N/A'" severity="secondary" rounded />
           </template>
         </Column>
         <Column header="操作" class="text-right pr-2" style="width: 180px">
-          <template #body="{ data }">
+          <template #body="{ data }: { data: MemberItem }">
             <div class="flex gap-2 justify-content-end">
               <PButton label="修改" icon="pi pi-pencil" outlined size="small"
                 @click="router.push(`/manage/account/editMe/${data.account}`)" />
@@ -149,10 +161,6 @@ onMounted(loadData);
       </DataTable>
 
       <Paginator :rows="10" :totalRecords="totalRecords" @page="onPageChange" />
-
-
     </div>
   </div>
 </template>
-
-<style scoped></style>

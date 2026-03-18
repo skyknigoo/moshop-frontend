@@ -60,7 +60,6 @@ const loadData = async () => {
   } finally {
     loading.value = false;
   }
-  toast.add({ severity: 'error', summary: '操作失敗', detail: '讀取資料失敗' });
 
 }
 

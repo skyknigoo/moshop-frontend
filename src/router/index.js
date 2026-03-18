@@ -23,7 +23,7 @@ import MAccountListMe from '../views/Manage/Account/MAccountListMe.vue'
 import MAccountCreate from '../views/Manage/Account/MAccountCreate.vue'
 import MAccountCreateMe from '../views/Manage/Account/MAccountCreateMe.vue'
 import MAccountEdit from '../views/Manage/Account/MAccountEdit.vue'
-import MAccountEditMe from '../views/Manage/Account/MAccountEditMe.vue'
+import MAccountEditMe from '../views/Manage/Account/MAccountEditme.vue'
 
 // 自己寫的
 import RegisterMe from '../views/Account/RegisterMe.vue'
